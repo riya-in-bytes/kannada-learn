@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Back up the Room database and DataStore so progress survives reinstalls. -->
+<full-backup-content>
+    <include domain="database" path="kannada_learn.db" />
+    <include domain="file" path="datastore/" />
+</full-backup-content>

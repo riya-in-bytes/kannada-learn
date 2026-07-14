@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kannada Learn</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_flashcards">Flashcards</string>
+    <string name="nav_quiz">Quiz</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Your Progress</string>
+    <string name="streak_label">Day Streak</string>
+    <string name="longest_streak_label">Longest streak: %1$d days</string>
+    <string name="words_mastered_label">Words Mastered</string>
+    <string name="words_mastered_value">%1$d of %2$d</string>
+    <string name="category_progress_title">Progress by Category</string>
+    <string name="dashboard_hint">Answer a word correctly %1$d times in quizzes to master it.</string>
+
+    <!-- Flashcards -->
+    <string name="flashcards_title">Flashcards</string>
+    <string name="category_all">All</string>
+    <string name="mastered_badge">Mastered</string>
+    <string name="speak_content_description">Hear pronunciation of %1$s</string>
+
+    <!-- Quiz -->
+    <string name="quiz_title">Quiz</string>
+    <string name="quiz_start_prompt">Test yourself with a quick randomized quiz.</string>
+    <string name="quiz_question_count_label">Number of questions</string>
+    <string name="quiz_start_button">Start Quiz</string>
+    <string name="quiz_progress">Question %1$d of %2$d</string>
+    <string name="quiz_prompt">Which is the Kannada word for “%1$s”?</string>
+    <string name="quiz_next">Next</string>
+    <string name="quiz_finish">Finish</string>
+    <string name="quiz_score_title">Quiz Complete!</string>
+    <string name="quiz_score_value">%1$d / %2$d</string>
+    <string name="quiz_score_perfect">Perfect score! ಅದ್ಭುತ (Adbhuta – Amazing!)</string>
+    <string name="quiz_score_good">Great work! Keep practicing.</string>
+    <string name="quiz_score_low">Keep going – review the flashcards and try again.</string>
+    <string name="quiz_restart">Take Another Quiz</string>
+    <string name="quiz_not_enough_words">Loading words…</string>
+
+    <!-- TTS -->
+    <string name="tts_unavailable">Kannada voice not available on this device. Install Kannada text-to-speech data in system settings to hear pronunciations.</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Pure-Compose app: the real theming happens in ui/theme/Theme.kt.
+        This platform theme only styles the window before Compose attaches,
+        so it parents a framework theme (no AppCompat dependency needed).
+    -->
+    <style name="Theme.KannadaLearn" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/ic_launcher_background</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
