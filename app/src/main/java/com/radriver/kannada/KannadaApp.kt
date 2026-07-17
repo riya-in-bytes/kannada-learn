@@ -15,8 +15,8 @@ import com.radriver.kannada.util.TtsManager
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     private val database = AppDatabase.getInstance(appContext)
-    private val userPrefs = UserPrefs(appContext)
 
+    val userPrefs = UserPrefs(appContext)
     val wordRepository = WordRepository(database.wordDao())
     val progressRepository = ProgressRepository(database.wordDao(), userPrefs)
     val ttsManager = TtsManager(appContext)

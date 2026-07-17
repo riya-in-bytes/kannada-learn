@@ -4,8 +4,10 @@ import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.Category
 
 /**
- * The embedded starter vocabulary: 46 fundamental words and phrases
- * (16 greetings/phrases, numbers 1-15, 15 essential verbs).
+ * The embedded vocabulary, split by the database version that introduced it:
+ * [v1Words] shipped with DB v1, [v2Words] were added by the v1→v2 migration.
+ * Fresh installs seed [words] (everything) in [AppDatabase]'s onCreate
+ * callback; upgrading installs get only [v2Words] from MIGRATION_1_2.
  *
  * Transliteration scheme (informal, learner-friendly):
  *  - long "aa" (ಾ), "ee" (ೀ), "oo" (ೂ) vowels are doubled;
@@ -14,7 +16,13 @@ import com.radriver.kannada.domain.model.Category
  */
 object SeedData {
 
-    val words: List<WordEntity> = buildList {
+    /**
+     * FROZEN: shipped in DB v1 (46 words: 16 greetings/phrases, numbers 1-15,
+     * 15 essential verbs), all BEGINNER. Never edit or reorder these entries —
+     * installed databases already contain these rows. New vocabulary goes in
+     * [SeedDataV2].
+     */
+    val v1Words: List<WordEntity> = buildList {
         // ---- Greetings & essential phrases ----
         greeting("Hello", "ನಮಸ್ಕಾರ", "Namaskaara")
         greeting("Welcome", "ಸುಸ್ವಾಗತ", "Susvaagata")
@@ -66,6 +74,24 @@ object SeedData {
         verb("To walk", "ನಡೆ", "Nade")
         verb("To read", "ಓದು", "Odu")
         verb("To write", "ಬರೆ", "Bare")
+    }
+
+    /** Added in DB v2 — see [SeedDataV2]. */
+    val v2Words: List<WordEntity> = SeedDataV2.words
+
+    /** The full vocabulary a fresh install seeds. */
+    val words: List<WordEntity> = v1Words + v2Words
+
+    init {
+        // buildQuiz dedupes options by kannada AND english, so seed duplicates
+        // would silently shrink option sets. Fail fast during development
+        // instead (first access happens off the main thread, from seeding).
+        check(words.distinctBy { it.kannada }.size == words.size) {
+            "Duplicate kannada text in seed data"
+        }
+        check(words.distinctBy { it.english }.size == words.size) {
+            "Duplicate english text in seed data"
+        }
     }
 
     private fun MutableList<WordEntity>.greeting(en: String, kn: String, tr: String) =

@@ -14,11 +14,15 @@
     <string name="words_mastered_label">Words Mastered</string>
     <string name="words_mastered_value">%1$d of %2$d</string>
     <string name="category_progress_title">Progress by Category</string>
+    <string name="level_progress_title">Progress by Level</string>
     <string name="dashboard_hint">Answer a word correctly %1$d times in quizzes to master it.</string>
+    <string name="dashboard_wotd_title">Word of the Day</string>
+    <string name="dashboard_due_review">%1$d words due for review — practice in Quiz</string>
 
     <!-- Flashcards -->
     <string name="flashcards_title">Flashcards</string>
     <string name="category_all">All</string>
+    <string name="level_all">All levels</string>
     <string name="mastered_badge">Mastered</string>
     <string name="speak_content_description">Hear pronunciation of %1$s</string>
 
@@ -37,7 +41,20 @@
     <string name="quiz_score_good">Great work! Keep practicing.</string>
     <string name="quiz_score_low">Keep going – review the flashcards and try again.</string>
     <string name="quiz_restart">Take Another Quiz</string>
-    <string name="quiz_not_enough_words">Loading words…</string>
+    <string name="quiz_not_enough_words">Not enough words at this level yet — try another level or “All levels”.</string>
+    <string name="quiz_mode_label">Quiz mode</string>
+    <string name="quiz_mode_en_to_kn">EN → ಕ</string>
+    <string name="quiz_mode_kn_to_en">ಕ → EN</string>
+    <string name="quiz_mode_listening">Listening</string>
+    <string name="quiz_mode_listening_needs_tts">Listening mode needs a Kannada voice — install Kannada text-to-speech in system settings.</string>
+    <string name="quiz_level_label">Level</string>
+    <string name="quiz_prompt_reverse">What does this mean?</string>
+    <string name="quiz_prompt_listening">What did you hear?</string>
+    <string name="quiz_replay_content_description">Replay the word</string>
+    <string name="quiz_review_title">Review</string>
+    <string name="quiz_review_button">Review %1$d due words</string>
+    <string name="quiz_review_none_due">Nothing due for review — words you answer in quizzes come back here on a spaced schedule.</string>
+    <string name="quiz_review_complete">Review Complete!</string>
 
     <!-- TTS -->
     <string name="tts_unavailable">Kannada voice not available on this device. Install Kannada text-to-speech data in system settings to hear pronunciations.</string>

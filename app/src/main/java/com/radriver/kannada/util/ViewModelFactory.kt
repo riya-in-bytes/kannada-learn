@@ -14,7 +14,7 @@ import com.radriver.kannada.ui.quiz.QuizViewModel
  * be added to any initializer later without restructuring).
  */
 fun appViewModelFactory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
-    initializer { DashboardViewModel(container.progressRepository) }
-    initializer { FlashcardsViewModel(container.wordRepository) }
-    initializer { QuizViewModel(container.wordRepository, container.progressRepository) }
+    initializer { DashboardViewModel(container.progressRepository, container.wordRepository) }
+    initializer { FlashcardsViewModel(container.wordRepository, container.userPrefs) }
+    initializer { QuizViewModel(container.wordRepository, container.progressRepository, container.userPrefs) }
 }

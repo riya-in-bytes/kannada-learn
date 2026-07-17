@@ -24,7 +24,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.radriver.kannada.R
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.Level
 import com.radriver.kannada.ui.components.FlashCard
+import com.radriver.kannada.ui.components.LevelFilterRow
 import com.radriver.kannada.ui.components.TtsUnavailableHint
 import com.radriver.kannada.util.TtsManager
 
@@ -41,6 +43,7 @@ fun FlashcardsScreen(
         uiState = uiState,
         ttsManager = ttsManager,
         onCategorySelected = viewModel::onCategorySelected,
+        onLevelSelected = viewModel::onLevelSelected,
         modifier = modifier
     )
 }
@@ -50,6 +53,7 @@ private fun FlashcardsContent(
     uiState: FlashcardsUiState,
     ttsManager: TtsManager,
     onCategorySelected: (Category?) -> Unit,
+    onLevelSelected: (Level?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -57,6 +61,11 @@ private fun FlashcardsContent(
             text = stringResource(R.string.flashcards_title),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
+        )
+
+        LevelFilterRow(
+            selected = uiState.selectedLevel,
+            onLevelSelected = onLevelSelected
         )
 
         CategoryFilterRow(

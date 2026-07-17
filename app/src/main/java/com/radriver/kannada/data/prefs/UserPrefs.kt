@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.radriver.kannada.domain.model.Level
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -34,6 +36,7 @@ class UserPrefs(context: Context) {
         val CURRENT_STREAK = intPreferencesKey("current_streak")
         val LONGEST_STREAK = intPreferencesKey("longest_streak")
         val LAST_ACTIVE_EPOCH_DAY = longPreferencesKey("last_active_epoch_day")
+        val LAST_LEVEL = stringPreferencesKey("last_level")
     }
 
     val streakInfo: Flow<StreakInfo> = dataStore.data
@@ -44,6 +47,23 @@ class UserPrefs(context: Context) {
             )
         }
         .distinctUntilChanged()
+
+    /**
+     * The last level the user filtered to; null = "All". Shared by the
+     * flashcards filter and the quiz setup so the choice follows the learner
+     * across tabs and survives process death. A stored name no Level matches
+     * (can't happen forward; defensive) also maps to null.
+     */
+    val selectedLevel: Flow<Level?> = dataStore.data
+        .map { prefs -> Level.entries.find { it.name == prefs[Keys.LAST_LEVEL] } }
+        .distinctUntilChanged()
+
+    suspend fun setSelectedLevel(level: Level?) {
+        dataStore.edit { prefs ->
+            if (level == null) prefs.remove(Keys.LAST_LEVEL)
+            else prefs[Keys.LAST_LEVEL] = level.name
+        }
+    }
 
     /**
      * Records that the app was used today and updates the streak:

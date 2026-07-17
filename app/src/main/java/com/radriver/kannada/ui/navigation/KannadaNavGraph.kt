@@ -38,6 +38,19 @@ fun KannadaNavGraph(
 ) {
     val navController = rememberNavController()
 
+    // Single tab-switch lambda shared by the bottom bar and in-content links
+    // (e.g. the dashboard's review card): every route change must use the
+    // same save/restore block or tab ViewModels lose their state.
+    val navigateToTab: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         modifier = modifier,
         bottomBar = {
@@ -50,15 +63,7 @@ fun KannadaNavGraph(
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy
                             ?.any { it.route == screen.route } == true,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { navigateToTab(screen.route) },
                         icon = { Icon(screen.icon, contentDescription = null) },
                         label = { Text(label) }
                     )
@@ -72,7 +77,11 @@ fun KannadaNavGraph(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Dashboard.route) {
-                DashboardScreen(viewModelFactory = viewModelFactory)
+                DashboardScreen(
+                    viewModelFactory = viewModelFactory,
+                    ttsManager = ttsManager,
+                    onGoToQuiz = { navigateToTab(Screen.Quiz.route) }
+                )
             }
             composable(Screen.Flashcards.route) {
                 FlashcardsScreen(viewModelFactory = viewModelFactory, ttsManager = ttsManager)

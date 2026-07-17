@@ -9,17 +9,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +43,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.radriver.kannada.R
-import com.radriver.kannada.domain.model.QuizOption
+import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.domain.model.Level
+import com.radriver.kannada.domain.model.QuizMode
 import com.radriver.kannada.domain.model.QuizQuestion
+import com.radriver.kannada.domain.model.QuizWord
+import com.radriver.kannada.ui.components.LevelFilterRow
 import com.radriver.kannada.ui.components.SpeakerButton
 import com.radriver.kannada.ui.components.TtsUnavailableHint
 import com.radriver.kannada.ui.theme.CorrectGreen
@@ -41,7 +56,7 @@ import com.radriver.kannada.ui.theme.CorrectGreenContainer
 import com.radriver.kannada.ui.theme.WrongRed
 import com.radriver.kannada.ui.theme.WrongRedContainer
 import com.radriver.kannada.util.TtsManager
-import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.util.TtsStatus
 import kotlin.math.roundToInt
 
 /** Stateful entry point: owns the ViewModel, hoists state into stateless content. */
@@ -57,8 +72,12 @@ fun QuizScreen(
     when (val state = uiState) {
         is QuizUiState.Setup -> QuizSetupContent(
             state = state,
+            ttsManager = ttsManager,
             onQuestionCountChanged = viewModel::onQuestionCountChanged,
+            onModeSelected = viewModel::onModeSelected,
+            onLevelSelected = viewModel::onLevelSelected,
             onStart = viewModel::startQuiz,
+            onStartReview = viewModel::startReview,
             modifier = modifier
         )
 
@@ -81,16 +100,26 @@ fun QuizScreen(
 @Composable
 private fun QuizSetupContent(
     state: QuizUiState.Setup,
+    ttsManager: TtsManager,
     onQuestionCountChanged: (Int) -> Unit,
+    onModeSelected: (QuizMode) -> Unit,
+    onLevelSelected: (Level?) -> Unit,
     onStart: () -> Unit,
+    onStartReview: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Resolve TTS availability up front so the Listening segment reflects
+    // reality before the first tap, not after it.
+    LaunchedEffect(Unit) { ttsManager.initialize() }
+    val ttsStatus by ttsManager.status.collectAsStateWithLifecycle()
+    val listeningAvailable = ttsStatus != TtsStatus.UNAVAILABLE
+
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = stringResource(R.string.quiz_title),
@@ -103,7 +132,56 @@ private fun QuizSetupContent(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = stringResource(R.string.quiz_mode_label),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            QuizMode.entries.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = state.mode == mode,
+                    onClick = { onModeSelected(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = QuizMode.entries.size),
+                    enabled = mode != QuizMode.LISTENING || listeningAvailable
+                ) {
+                    Text(
+                        text = stringResource(
+                            when (mode) {
+                                QuizMode.EN_TO_KN -> R.string.quiz_mode_en_to_kn
+                                QuizMode.KN_TO_EN -> R.string.quiz_mode_kn_to_en
+                                QuizMode.LISTENING -> R.string.quiz_mode_listening
+                            }
+                        )
+                    )
+                }
+            }
+        }
+        if (!listeningAvailable) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.quiz_mode_listening_needs_tts),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = stringResource(R.string.quiz_level_label),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        LevelFilterRow(
+            selected = state.level,
+            onLevelSelected = onLevelSelected
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = stringResource(R.string.quiz_question_count_label) + ": ${state.questionCount}",
@@ -118,7 +196,7 @@ private fun QuizSetupContent(
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (state.isBuilding) {
             CircularProgressIndicator()
@@ -133,7 +211,33 @@ private fun QuizSetupContent(
             Text(
                 text = stringResource(R.string.quiz_not_enough_words),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = stringResource(R.string.quiz_review_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        if (state.dueForReview > 0) {
+            OutlinedButton(
+                onClick = onStartReview,
+                enabled = !state.isBuilding
+            ) {
+                Text(stringResource(R.string.quiz_review_button, state.dueForReview))
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.quiz_review_none_due),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -170,9 +274,12 @@ private fun QuizQuestionContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = stringResource(R.string.quiz_prompt, question.promptEnglish),
-            style = MaterialTheme.typography.headlineSmall
+        QuizPrompt(
+            mode = state.mode,
+            question = question,
+            answered = state.answered,
+            ttsManager = ttsManager,
+            currentIndex = state.currentIndex
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -181,6 +288,7 @@ private fun QuizQuestionContent(
             QuizOptionCard(
                 option = option,
                 question = question,
+                mode = state.mode,
                 answered = state.answered,
                 selectedWordId = state.selectedWordId,
                 ttsManager = ttsManager,
@@ -205,10 +313,93 @@ private fun QuizQuestionContent(
     }
 }
 
+/** The question block, rendered per quiz mode. */
+@Composable
+private fun QuizPrompt(
+    mode: QuizMode,
+    question: QuizQuestion,
+    answered: Boolean,
+    ttsManager: TtsManager,
+    currentIndex: Int
+) {
+    when (mode) {
+        QuizMode.EN_TO_KN -> Text(
+            text = stringResource(R.string.quiz_prompt, question.prompt.english),
+            style = MaterialTheme.typography.headlineSmall
+        )
+
+        QuizMode.KN_TO_EN -> Column {
+            Text(
+                text = stringResource(R.string.quiz_prompt_reverse),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = question.prompt.kannada,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        text = question.prompt.transliteration,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
+                SpeakerButton(text = question.prompt.kannada, ttsManager = ttsManager)
+            }
+        }
+
+        QuizMode.LISTENING -> {
+            val ttsStatus by ttsManager.status.collectAsStateWithLifecycle()
+            // Speak each new question once; QUEUE_FLUSH handles rapid Next
+            // taps, and a rotation merely replays the word (harmless).
+            LaunchedEffect(currentIndex) { ttsManager.speak(question.prompt.kannada) }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.quiz_prompt_listening),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                FilledTonalIconButton(
+                    onClick = { ttsManager.speak(question.prompt.kannada) },
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = stringResource(R.string.quiz_replay_content_description)
+                    )
+                }
+                // Reveal the script once answered — the learner should see
+                // what they heard. If the engine died mid-quiz, always show
+                // it (the question degrades to reverse mode instead of
+                // becoming unanswerable).
+                if (answered || ttsStatus == TtsStatus.UNAVAILABLE) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = question.prompt.kannada,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        text = question.prompt.transliteration,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun QuizOptionCard(
-    option: QuizOption,
+    option: QuizWord,
     question: QuizQuestion,
+    mode: QuizMode,
     answered: Boolean,
     selectedWordId: Int?,
     ttsManager: TtsManager,
@@ -247,25 +438,38 @@ private fun QuizOptionCard(
         ),
         border = BorderStroke(1.dp, borderColor)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f, fill = false)) {
-                Text(
-                    text = option.kannada,
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Text(
-                    text = option.transliteration,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontStyle = FontStyle.Italic
-                )
+        if (mode == QuizMode.EN_TO_KN) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = option.kannada,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = option.transliteration,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
+                SpeakerButton(text = option.kannada, ttsManager = ttsManager)
             }
-            SpeakerButton(text = option.kannada, ttsManager = ttsManager)
+        } else {
+            // KN_TO_EN and LISTENING answer in English: no speaker button —
+            // the Kannada-locale engine mangles English, and in listening
+            // mode it would double as an unintended hint.
+            Text(
+                text = option.english,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            )
         }
     }
 }
@@ -291,7 +495,9 @@ private fun QuizResultContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = stringResource(R.string.quiz_score_title),
+            text = stringResource(
+                if (state.isReview) R.string.quiz_review_complete else R.string.quiz_score_title
+            ),
             style = MaterialTheme.typography.headlineMedium
         )
         Spacer(modifier = Modifier.height(16.dp))

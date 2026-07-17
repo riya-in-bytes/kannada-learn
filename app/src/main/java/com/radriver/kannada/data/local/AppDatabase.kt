@@ -7,11 +7,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.local.entity.WordEntity
 
-@Database(entities = [WordEntity::class], version = 1, exportSchema = false)
+@Database(entities = [WordEntity::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
@@ -31,9 +32,32 @@ abstract class AppDatabase : RoomDatabase() {
                     DB_NAME
                 )
                     .addCallback(SeedCallback)
+                    // Never fall back to destructive migration: it would wipe
+                    // the user's per-word progress (correctCount/wrongCount).
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { instance = it }
             }
+
+        /**
+         * Single raw-insert path shared by [SeedCallback] and [MIGRATION_1_2]
+         * so the two call sites can never drift on columns. Any new column
+         * must be added here AND to the entity AND to the migration that
+         * introduces it.
+         */
+        private fun insertWord(db: SupportSQLiteDatabase, word: WordEntity) {
+            val values = ContentValues().apply {
+                put("english", word.english)
+                put("kannada", word.kannada)
+                put("transliteration", word.transliteration)
+                put("category", word.category.name)
+                put("level", word.level.name)
+                put("correctCount", word.correctCount)
+                put("wrongCount", word.wrongCount)
+                // lastAnsweredEpochDay intentionally omitted -> NULL (never answered)
+            }
+            db.insert("words", SQLiteDatabase.CONFLICT_ABORT, values)
+        }
 
         /**
          * Seeds the starter vocabulary synchronously inside onCreate.
@@ -51,16 +75,29 @@ abstract class AppDatabase : RoomDatabase() {
         private object SeedCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                SeedData.words.forEach { word ->
-                    val values = ContentValues().apply {
-                        put("english", word.english)
-                        put("kannada", word.kannada)
-                        put("transliteration", word.transliteration)
-                        put("category", word.category.name)
-                        put("correctCount", word.correctCount)
-                    }
-                    db.insert("words", SQLiteDatabase.CONFLICT_ABORT, values)
-                }
+                SeedData.words.forEach { insertWord(db, it) }
+            }
+        }
+
+        /**
+         * v1 -> v2: difficulty levels + review tracking + the v2 vocabulary.
+         *
+         * The DEFAULT clauses must stay byte-identical to the entity's
+         * @ColumnInfo(defaultValue) annotations — Room validates the live
+         * schema against them and crashes upgrades on any mismatch.
+         * `DEFAULT 'BEGINNER'` is also the level backfill: every v1 word is
+         * BEGINNER by design, so no UPDATE statements are needed.
+         *
+         * Room runs migrations inside a transaction, so a crash mid-migration
+         * rolls back cleanly and it reruns on next launch — same atomicity
+         * philosophy as the onCreate seed.
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE words ADD COLUMN level TEXT NOT NULL DEFAULT 'BEGINNER'")
+                db.execSQL("ALTER TABLE words ADD COLUMN wrongCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE words ADD COLUMN lastAnsweredEpochDay INTEGER")
+                SeedData.v2Words.forEach { insertWord(db, it) }
             }
         }
     }
