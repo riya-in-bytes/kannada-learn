@@ -2,14 +2,16 @@ package com.radriver.kannada.data.local
 
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.romanizationKey
 
 /**
- * The embedded vocabulary, split by the database version that introduced it:
- * [v1Words] shipped with DB v1, [v2Words] were added by the v1→v2 migration.
+ * The embedded vocabulary, split by language and by the database version
+ * that introduced it: Kannada [v1Words] shipped with DB v1, [v2Words] and
+ * [v3Words] came with the v2/v3 migrations, and [gujaratiV1Words] with v4.
  * Fresh installs seed [words] (everything) in [AppDatabase]'s onCreate
- * callback; upgrading installs get only [v2Words] from MIGRATION_1_2.
+ * callback; upgrading installs get only each migration's own list.
  *
- * Transliteration scheme (informal, learner-friendly):
+ * Kannada transliteration scheme (the Gujarati list follows the same one):
  *  - long "aa" (ಾ), "ee" (ೀ), "oo" (ೂ) vowels are doubled;
  *  - Kannada ē/ō are written as plain e/o (closest English reading);
  *  - aspirates keep h (dh, bh, th); retroflex consonants are unmarked.
@@ -82,27 +84,85 @@ object SeedData {
     /** Added in DB v3 — see [SeedDataV3]. */
     val v3Words: List<WordEntity> = SeedDataV3.words
 
+    /** Every Kannada word, in id order. */
+    val kannadaWords: List<WordEntity> = v1Words + v2Words + v3Words
+
+    /** Added in DB v4 — see [SeedDataGujarati]. */
+    val gujaratiV1Words: List<WordEntity> = SeedDataGujarati.words
+
     /** The full vocabulary a fresh install seeds. */
-    val words: List<WordEntity> = v1Words + v2Words + v3Words
+    val words: List<WordEntity> = kannadaWords + gujaratiV1Words
 
     init {
-        // buildQuiz dedupes options by kannada AND english, so seed duplicates
-        // would silently shrink option sets. Fail fast during development
-        // instead (first access happens off the main thread, from seeding).
-        check(words.distinctBy { it.kannada }.size == words.size) {
-            "Duplicate kannada text in seed data"
-        }
-        check(words.distinctBy { it.english }.size == words.size) {
-            "Duplicate english text in seed data"
-        }
+        // Fail fast during development instead of silently shrinking quiz
+        // option sets (first access happens off the main thread, from seeding).
+        checkSeedInvariants(words)
+        checkMirror(kannadaWords, gujaratiV1Words, SeedDataGujarati.ENGLISH_OVERRIDES)
     }
 
     private fun MutableList<WordEntity>.greeting(en: String, kn: String, tr: String) =
-        add(WordEntity(english = en, kannada = kn, transliteration = tr, category = Category.GREETINGS))
+        add(WordEntity(english = en, script = kn, transliteration = tr, category = Category.GREETINGS))
 
     private fun MutableList<WordEntity>.number(en: String, kn: String, tr: String) =
-        add(WordEntity(english = en, kannada = kn, transliteration = tr, category = Category.NUMBERS))
+        add(WordEntity(english = en, script = kn, transliteration = tr, category = Category.NUMBERS))
 
     private fun MutableList<WordEntity>.verb(en: String, kn: String, tr: String) =
-        add(WordEntity(english = en, kannada = kn, transliteration = tr, category = Category.VERBS))
+        add(WordEntity(english = en, script = kn, transliteration = tr, category = Category.VERBS))
+}
+
+/**
+ * buildQuiz dedupes options by script, English and romanization, so seed
+ * duplicates would silently shrink option sets. Checked per language —
+ * mirrored vocabularies share their English by design. Romanizations must be
+ * unique only where they are the visible text (languages that don't show
+ * their script); Kannada legitimately repeats one ("Anna").
+ */
+internal fun checkSeedInvariants(words: List<WordEntity>) {
+    words.groupBy { it.language }.forEach { (language, list) ->
+        list.requireUnique("$language script") { it.script }
+        list.requireUnique("$language english") { it.english }
+        if (!language.showsScript) {
+            list.requireUnique("$language romanization") { romanizationKey(it.transliteration) }
+        }
+    }
+}
+
+/**
+ * [mirror] must be [source] entry-for-entry: same (english, category, level),
+ * in the same order, with english changed only through [englishOverrides].
+ * Number words can never be overridden — quiz filtering
+ * ([com.radriver.kannada.data.repository.WordRepository.ALLOWED_QUIZ_NUMBERS])
+ * and number ordering ([com.radriver.kannada.domain.model.numberDisplayRank])
+ * match on them. Keeps the languages' categories, levels and progress bars
+ * comparable, and catches a dropped or misplaced entry at first launch.
+ */
+internal fun checkMirror(
+    source: List<WordEntity>,
+    mirror: List<WordEntity>,
+    englishOverrides: Map<String, String>
+) {
+    val overriddenNumbers = source.filter {
+        it.category == Category.NUMBERS && it.english in englishOverrides
+    }
+    check(overriddenNumbers.isEmpty()) {
+        "Number words can't be overridden: ${overriddenNumbers.map { it.english }}"
+    }
+    val unknownOverrides = englishOverrides.keys - source.map { it.english }.toSet()
+    check(unknownOverrides.isEmpty()) { "Overrides for words not in the source list: $unknownOverrides" }
+
+    val expected = source.map { Triple(englishOverrides[it.english] ?: it.english, it.category, it.level) }
+    val actual = mirror.map { Triple(it.english, it.category, it.level) }
+    // A missing entry shows up as a mismatch at its index; extra trailing
+    // entries as a mismatch just past the end of the source.
+    val mismatchAt = expected.indices.firstOrNull { expected[it] != actual.getOrNull(it) }
+        ?: expected.size.takeIf { actual.size > it }
+    check(mismatchAt == null) {
+        "Mirror doesn't match its source (${actual.size} of ${expected.size} entries); first difference at " +
+            "index $mismatchAt: expected ${expected.getOrNull(mismatchAt!!)}, got ${actual.getOrNull(mismatchAt)}"
+    }
+}
+
+private fun <K> List<WordEntity>.requireUnique(what: String, key: (WordEntity) -> K) {
+    val duplicates = groupBy(key).filterValues { it.size > 1 }.keys
+    check(duplicates.isEmpty()) { "Duplicate $what in seed data: $duplicates" }
 }

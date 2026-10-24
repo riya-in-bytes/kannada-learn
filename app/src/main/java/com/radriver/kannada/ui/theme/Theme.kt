@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import com.radriver.kannada.domain.model.Language
 
 private val LightColors = lightColorScheme(
     primary = Gold40,
@@ -34,13 +35,48 @@ private val DarkColors = darkColorScheme(
     surface = DarkBackground
 )
 
+private val GujaratiLightColors = lightColorScheme(
+    primary = Maroon40,
+    primaryContainer = MaroonContainer,
+    onPrimaryContainer = OnMaroonContainer,
+    secondary = Marigold40,
+    secondaryContainer = MarigoldContainer,
+    onSecondaryContainer = OnMarigoldContainer,
+    tertiary = Teal40,
+    tertiaryContainer = TealContainer,
+    onTertiaryContainer = OnTealContainer,
+    background = LightBackground,
+    surface = LightBackground
+)
+
+private val GujaratiDarkColors = darkColorScheme(
+    primary = Maroon80,
+    onPrimary = OnMaroon80,
+    primaryContainer = MaroonContainerDark,
+    onPrimaryContainer = OnMaroonContainerDark,
+    secondary = Marigold80,
+    secondaryContainer = MarigoldContainerDark,
+    onSecondaryContainer = OnMarigoldContainerDark,
+    tertiary = Teal80,
+    tertiaryContainer = TealContainerDark,
+    onTertiaryContainer = OnTealContainerDark,
+    background = DarkBackground,
+    surface = DarkBackground
+)
+
+/** Each language gets its own accent palette, so the active one is obvious at a glance. */
 @Composable
 fun KannadaLearnTheme(
+    language: Language = Language.DEFAULT,
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    val colorScheme = when (language) {
+        Language.KANNADA -> if (darkTheme) DarkColors else LightColors
+        Language.GUJARATI -> if (darkTheme) GujaratiDarkColors else GujaratiLightColors
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = AppTypography,
         content = content
     )

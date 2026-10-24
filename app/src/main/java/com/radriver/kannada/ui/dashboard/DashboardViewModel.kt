@@ -7,12 +7,17 @@ import com.radriver.kannada.data.local.dao.CategoryProgress
 import com.radriver.kannada.data.local.dao.LevelProgress
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.data.prefs.UserPrefs
+import com.radriver.kannada.data.repository.DashboardData
 import com.radriver.kannada.data.repository.ProgressRepository
 import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.data.session.LanguageSession
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.Language
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -20,6 +25,8 @@ import java.time.LocalDate
 @Immutable
 data class DashboardUiState(
     val isLoading: Boolean = true,
+    /** The language every count and the word of the day belong to; the streak is shared. */
+    val language: Language = Language.DEFAULT,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
     val masteredWords: Int = 0,
@@ -30,33 +37,27 @@ data class DashboardUiState(
     val wordOfTheDay: WordEntity? = null
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
     progressRepository: ProgressRepository,
     wordRepository: WordRepository,
-    private val userPrefs: UserPrefs
+    private val userPrefs: UserPrefs,
+    languageSession: LanguageSession
 ) : ViewModel() {
 
-    val uiState: StateFlow<DashboardUiState> = combine(
-        progressRepository.dashboardData,
-        wordRepository.wordOfTheDay(),
-        userPrefs.wotdDismissedEpochDay
-    ) { data, wordOfTheDay, dismissedEpochDay ->
-        // Hide today's word once dismissed; it returns tomorrow because
-        // wordOfTheDay() picks a new word each day and "today" is read here
-        // per emission (correct across a midnight rollover).
-        val visibleWord =
-            wordOfTheDay?.takeUnless { dismissedEpochDay == LocalDate.now().toEpochDay() }
-        DashboardUiState(
-            isLoading = false,
-            currentStreak = data.currentStreak,
-            longestStreak = data.longestStreak,
-            masteredWords = data.masteredWords,
-            totalWords = data.totalWords,
-            categoryProgress = data.categoryProgress,
-            levelProgress = data.levelProgress,
-            dueForReview = data.dueForReview,
-            wordOfTheDay = visibleWord
-        )
+    val uiState: StateFlow<DashboardUiState> = languageSession.current.flatMapLatest { language ->
+        combine(
+            progressRepository.dashboardData(language),
+            wordRepository.wordOfTheDay(language),
+            userPrefs.wotdDismissedEpochDay(language)
+        ) { data, wordOfTheDay, dismissedEpochDay ->
+            // Hide today's word once dismissed; it returns tomorrow because
+            // wordOfTheDay() picks a new word each day and "today" is read here
+            // per emission (correct across a midnight rollover).
+            val visibleWord =
+                wordOfTheDay?.takeUnless { dismissedEpochDay == LocalDate.now().toEpochDay() }
+            dashboardUiState(language, data, visibleWord)
+        }
     }
         .stateIn(
             scope = viewModelScope,
@@ -68,9 +69,28 @@ class DashboardViewModel(
             initialValue = DashboardUiState()
         )
 
-    /** Dismisses the Word of the Day for the rest of today. */
+    private fun dashboardUiState(language: Language, data: DashboardData, visibleWord: WordEntity?) =
+        DashboardUiState(
+            isLoading = false,
+            language = language,
+            currentStreak = data.currentStreak,
+            longestStreak = data.longestStreak,
+            masteredWords = data.masteredWords,
+            totalWords = data.totalWords,
+            categoryProgress = data.categoryProgress,
+            levelProgress = data.levelProgress,
+            dueForReview = data.dueForReview,
+            wordOfTheDay = visibleWord
+        )
+
+    /**
+     * Dismisses the displayed Word of the Day for the rest of today — keyed
+     * by that word's own language, so a dismiss racing a language switch
+     * can't hide the other language's word.
+     */
     fun onDismissWordOfTheDay() {
-        viewModelScope.launch { userPrefs.dismissWordOfTheDay() }
+        val word = uiState.value.wordOfTheDay ?: return
+        viewModelScope.launch { userPrefs.dismissWordOfTheDay(word.language) }
     }
 
     /**

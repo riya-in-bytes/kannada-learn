@@ -11,17 +11,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.radriver.kannada.R
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.util.TtsManager
 import com.radriver.kannada.util.TtsStatus
 
 /**
- * Speaker icon that voices [text] (Kannada script) through the native TTS
- * engine. Renders disabled when the device has no Kannada voice; the screen
+ * Speaker icon that voices [text] (native script) with [language]'s TTS
+ * voice. [label] is what the learner sees for the word — used for the
+ * accessibility description, so a hidden script is never read out. Renders
+ * disabled when the device has no voice for the active language; the screen
  * hosting it is responsible for explaining why (see TtsUnavailableHint).
  */
 @Composable
 fun SpeakerButton(
     text: String,
+    language: Language,
+    label: String,
     ttsManager: TtsManager,
     modifier: Modifier = Modifier
 ) {
@@ -29,13 +34,13 @@ fun SpeakerButton(
     val enabled = status != TtsStatus.UNAVAILABLE
 
     IconButton(
-        onClick = { ttsManager.speak(text) },
+        onClick = { ttsManager.speak(text, language) },
         enabled = enabled,
         modifier = modifier
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-            contentDescription = stringResource(R.string.speak_content_description, text),
+            contentDescription = stringResource(R.string.speak_content_description, label),
             tint = if (enabled) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         )

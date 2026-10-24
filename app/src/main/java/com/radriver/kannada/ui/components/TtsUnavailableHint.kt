@@ -21,8 +21,9 @@ import com.radriver.kannada.util.TtsManager
 import com.radriver.kannada.util.TtsStatus
 
 /**
- * Inline banner shown only when the device lacks a Kannada TTS voice,
- * explaining why speaker buttons are disabled and how to fix it.
+ * Inline banner shown only when the device lacks a TTS voice for the
+ * language being learned, explaining why speaker buttons are disabled and
+ * how to fix it.
  */
 @Composable
 fun TtsUnavailableHint(
@@ -30,6 +31,7 @@ fun TtsUnavailableHint(
     modifier: Modifier = Modifier
 ) {
     val status by ttsManager.status.collectAsStateWithLifecycle()
+    val language by ttsManager.voiceLanguage.collectAsStateWithLifecycle()
     if (status != TtsStatus.UNAVAILABLE) return
 
     Surface(
@@ -47,7 +49,7 @@ fun TtsUnavailableHint(
                 tint = MaterialTheme.colorScheme.onTertiaryContainer
             )
             Text(
-                text = stringResource(R.string.tts_unavailable),
+                text = stringResource(R.string.tts_unavailable, language.displayName),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.padding(start = 8.dp)

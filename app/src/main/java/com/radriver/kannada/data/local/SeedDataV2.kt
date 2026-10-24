@@ -239,7 +239,7 @@ internal object SeedDataV2 {
     private fun MutableList<WordEntity>.word(
         category: Category, level: Level, en: String, kn: String, tr: String
     ) = add(
-        WordEntity(english = en, kannada = kn, transliteration = tr, category = category, level = level)
+        WordEntity(english = en, script = kn, transliteration = tr, category = category, level = level)
     )
 
     /** Counting beyond 15 assumes the beginner numbers, so it starts at INTERMEDIATE. */

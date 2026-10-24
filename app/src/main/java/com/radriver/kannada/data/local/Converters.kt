@@ -2,6 +2,7 @@ package com.radriver.kannada.data.local
 
 import androidx.room.TypeConverter
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.domain.model.Level
 
 class Converters {
@@ -16,4 +17,10 @@ class Converters {
 
     @TypeConverter
     fun toLevel(name: String): Level = Level.valueOf(name)
+
+    @TypeConverter
+    fun fromLanguage(language: Language): String = language.name
+
+    @TypeConverter
+    fun toLanguage(name: String): Language = Language.valueOf(name)
 }

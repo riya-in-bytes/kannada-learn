@@ -4,6 +4,7 @@ import com.radriver.kannada.data.local.dao.CategoryProgress
 import com.radriver.kannada.data.local.dao.LevelProgress
 import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.prefs.UserPrefs
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -22,6 +23,14 @@ data class DashboardData(
     val dueForReview: Int
 )
 
+/** One row of the Languages tab: a language's headline progress. */
+data class LanguageSummary(
+    val language: Language,
+    val masteredWords: Int,
+    val totalWords: Int,
+    val dueForReview: Int
+)
+
 class ProgressRepository(
     private val wordDao: WordDao,
     private val userPrefs: UserPrefs
@@ -35,13 +44,17 @@ class ProgressRepository(
         val levelProgress: List<LevelProgress>
     )
 
-    /** Combined stream of streak metrics (DataStore) and mastery counts (Room). */
-    val dashboardData: Flow<DashboardData> = combine(
+    /**
+     * Combined stream of streak metrics (DataStore) and [language]'s mastery
+     * counts (Room). The streak is shared across languages — it tracks the
+     * daily habit, not one vocabulary.
+     */
+    fun dashboardData(language: Language): Flow<DashboardData> = combine(
         combine(
-            wordDao.masteredCount(MASTERY_THRESHOLD),
-            wordDao.totalCount(),
-            wordDao.categoryProgress(MASTERY_THRESHOLD),
-            wordDao.levelProgress(MASTERY_THRESHOLD)
+            wordDao.masteredCount(language, MASTERY_THRESHOLD),
+            wordDao.totalCount(language),
+            wordDao.categoryProgress(language, MASTERY_THRESHOLD),
+            wordDao.levelProgress(language, MASTERY_THRESHOLD)
         ) { mastered, total, categories, levels ->
             // GROUP BY returns rows alphabetically; present in enum order
             // (Beginner→Intermediate→Advanced, curriculum category order).
@@ -53,9 +66,7 @@ class ProgressRepository(
             )
         },
         userPrefs.streakInfo,
-        // flow{} defers LocalDate.now() to collection time: the repository is
-        // app-scoped, so binding "today" here would freeze it at first launch.
-        flow { emitAll(wordDao.dueForReviewCount(LocalDate.now().toEpochDay())) }
+        dueForReviewCount(language)
     ) { stats, streak, dueForReview ->
         DashboardData(
             currentStreak = streak.currentStreak,
@@ -67,6 +78,22 @@ class ProgressRepository(
             dueForReview = dueForReview
         )
     }
+
+    /** Headline progress for every language, in [Language] order (Languages tab). */
+    val languageSummaries: Flow<List<LanguageSummary>> = combine(
+        Language.entries.map { language ->
+            combine(
+                wordDao.masteredCount(language, MASTERY_THRESHOLD),
+                wordDao.totalCount(language),
+                dueForReviewCount(language)
+            ) { mastered, total, due -> LanguageSummary(language, mastered, total, due) }
+        }
+    ) { it.toList() }
+
+    // flow{} defers LocalDate.now() to collection time: the repository is
+    // app-scoped, so binding "today" here would freeze it at first launch.
+    private fun dueForReviewCount(language: Language): Flow<Int> =
+        flow { emitAll(wordDao.dueForReviewCount(language, LocalDate.now().toEpochDay())) }
 
     /**
      * Called for every quiz answer. Correct answers advance mastery; wrong

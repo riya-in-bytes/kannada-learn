@@ -81,4 +81,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // JVM unit tests (app/src/test) for pure-Kotlin logic: seed invariants, quiz building.
+    testImplementation(libs.junit)
 }

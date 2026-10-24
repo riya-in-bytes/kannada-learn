@@ -6,32 +6,34 @@ package com.radriver.kannada.domain.model
  * mode-agnostic because [QuizWord] carries every surface of a word.
  */
 enum class QuizMode {
-    /** Prompt is English, options are Kannada (the original mode). */
-    EN_TO_KN,
+    /** Prompt is English, options are in the target language (the original mode). */
+    EN_TO_TARGET,
 
-    /** Prompt is Kannada script + transliteration, options are English. */
-    KN_TO_EN,
+    /** Prompt is the target-language word, options are English. */
+    TARGET_TO_EN,
 
-    /** Prompt is TTS audio only (script hidden until answered), options are English. */
+    /** Prompt is TTS audio only (word hidden until answered), options are English. */
     LISTENING
 }
 
 /**
- * One word rendered as a prompt or an option. Carries all three surfaces
- * (English, Kannada script, transliteration) so the UI picks what to show
- * per [QuizMode] and the speaker button can voice the Kannada text.
+ * One word rendered as a prompt or an option. Carries every surface
+ * (English, native script, transliteration) so the UI picks what to show
+ * per [QuizMode] and the speaker button can voice the [script]. Rendering
+ * follows the word's own [language] (see [Language.showsScript]).
  */
 data class QuizWord(
     val wordId: Int,
     val english: String,
-    val kannada: String,
-    val transliteration: String
+    val script: String,
+    val transliteration: String,
+    val language: Language
 )
 
 /**
  * A single quiz question. [prompt] is the correct word itself; [options]
- * always contains it plus distractors unique by both Kannada and English
- * text, pre-shuffled at build time so the UI renders the list as-is.
+ * always contains it plus distractors unique by script, transliteration and
+ * English text, pre-shuffled at build time so the UI renders the list as-is.
  */
 data class QuizQuestion(
     val correctWordId: Int,

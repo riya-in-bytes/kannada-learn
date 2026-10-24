@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.domain.model.Level
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -40,7 +41,12 @@ class UserPrefs(context: Context) {
         val LAST_LEVEL = stringPreferencesKey("last_level")
         val LAST_CATEGORY = stringPreferencesKey("last_category")
         val APP_OPEN_COUNT = intPreferencesKey("app_open_count")
+        /** Kannada's key predates per-language dismissal, so it keeps the bare name. */
         val WOTD_DISMISSED_EPOCH_DAY = longPreferencesKey("wotd_dismissed_epoch_day")
+
+        fun wotdDismissedEpochDay(language: Language) =
+            if (language == Language.KANNADA) WOTD_DISMISSED_EPOCH_DAY
+            else longPreferencesKey("wotd_dismissed_epoch_day_${language.name}")
     }
 
     val streakInfo: Flow<StreakInfo> = dataStore.data
@@ -103,14 +109,17 @@ class UserPrefs(context: Context) {
         }
     }
 
-    /** Epoch-day the Word of the Day was last dismissed; null = never. */
-    val wotdDismissedEpochDay: Flow<Long?> = dataStore.data
-        .map { prefs -> prefs[Keys.WOTD_DISMISSED_EPOCH_DAY] }
+    /**
+     * Epoch-day [language]'s Word of the Day was last dismissed; null = never.
+     * Per language, so dismissing one language's word doesn't hide the other's.
+     */
+    fun wotdDismissedEpochDay(language: Language): Flow<Long?> = dataStore.data
+        .map { prefs -> prefs[Keys.wotdDismissedEpochDay(language)] }
         .distinctUntilChanged()
 
-    /** Hides the Word of the Day for the rest of [today]. */
-    suspend fun dismissWordOfTheDay(today: LocalDate = LocalDate.now()) {
-        dataStore.edit { prefs -> prefs[Keys.WOTD_DISMISSED_EPOCH_DAY] = today.toEpochDay() }
+    /** Hides [language]'s Word of the Day for the rest of [today]. */
+    suspend fun dismissWordOfTheDay(language: Language, today: LocalDate = LocalDate.now()) {
+        dataStore.edit { prefs -> prefs[Keys.wotdDismissedEpochDay(language)] = today.toEpochDay() }
     }
 
     /**

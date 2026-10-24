@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.radriver.kannada.R
 import com.radriver.kannada.data.local.entity.WordEntity
@@ -26,9 +25,10 @@ import com.radriver.kannada.ui.theme.CorrectGreen
 import com.radriver.kannada.util.TtsManager
 
 /**
- * One vocabulary card: English on top, Kannada script large in the middle
- * with its speaker button, transliteration underneath, and a mastered badge
- * once the word has been answered correctly enough times.
+ * One vocabulary card: English on top, the word large in the middle with its
+ * speaker button, transliteration underneath (for a language that shows its
+ * script — otherwise the large line already is the transliteration), and a
+ * mastered badge once the word has been answered correctly enough times.
  */
 @Composable
 fun FlashCard(
@@ -77,19 +77,23 @@ fun FlashCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = word.kannada,
+                TargetPrimaryText(
+                    word = word,
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                SpeakerButton(text = word.kannada, ttsManager = ttsManager)
+                SpeakerButton(
+                    text = word.script,
+                    language = word.language,
+                    label = word.displayText,
+                    ttsManager = ttsManager
+                )
             }
 
-            Text(
-                text = word.transliteration,
+            TargetSecondaryText(
+                word = word,
                 style = MaterialTheme.typography.titleMedium,
-                fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
             )
         }

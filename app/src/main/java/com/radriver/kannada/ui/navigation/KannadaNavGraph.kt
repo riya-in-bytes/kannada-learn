@@ -19,12 +19,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.radriver.kannada.ui.dashboard.DashboardScreen
 import com.radriver.kannada.ui.flashcards.FlashcardsScreen
+import com.radriver.kannada.ui.languages.LanguagesScreen
 import com.radriver.kannada.ui.mastered.MasteredWordsScreen
 import com.radriver.kannada.ui.quiz.QuizScreen
 import com.radriver.kannada.util.TtsManager
 
 /**
- * Root scaffold: three-tab bottom navigation over a NavHost.
+ * Root scaffold: four-tab bottom navigation over a NavHost.
  *
  * Tab switches use the canonical save/restore pattern so each tab keeps its
  * NavBackStackEntry (and therefore its ViewModel and scroll state) alive, and
@@ -40,8 +41,9 @@ fun KannadaNavGraph(
     val navController = rememberNavController()
 
     // Single tab-switch lambda shared by the bottom bar and in-content links
-    // (e.g. the dashboard's review card): every route change must use the
-    // same save/restore block or tab ViewModels lose their state.
+    // (e.g. the dashboard's review card, the language badges): every route
+    // change must use the same save/restore block or tab ViewModels lose
+    // their state.
     val navigateToTab: (String) -> Unit = { route ->
         navController.navigate(route) {
             popUpTo(navController.graph.findStartDestination().id) {
@@ -88,20 +90,37 @@ fun KannadaNavGraph(
                     onGoToFlashcards = { navigateToTab(Screen.Flashcards.route) },
                     // A plain push, not navigateToTab: this screen sits on top
                     // of the dashboard, and popUpTo(start) would drop it.
-                    onShowMasteredWords = { navController.navigate(Routes.MASTERED_WORDS) }
+                    onShowMasteredWords = { navController.navigate(Routes.MASTERED_WORDS) },
+                    onOpenLanguages = { navigateToTab(Screen.Languages.route) }
                 )
             }
             composable(Screen.Flashcards.route) {
-                FlashcardsScreen(viewModelFactory = viewModelFactory, ttsManager = ttsManager)
+                FlashcardsScreen(
+                    viewModelFactory = viewModelFactory,
+                    ttsManager = ttsManager,
+                    onOpenLanguages = { navigateToTab(Screen.Languages.route) }
+                )
             }
             composable(Screen.Quiz.route) {
-                QuizScreen(viewModelFactory = viewModelFactory, ttsManager = ttsManager)
+                QuizScreen(
+                    viewModelFactory = viewModelFactory,
+                    ttsManager = ttsManager,
+                    onOpenLanguages = { navigateToTab(Screen.Languages.route) }
+                )
+            }
+            composable(Screen.Languages.route) {
+                LanguagesScreen(
+                    viewModelFactory = viewModelFactory,
+                    // Land on the new language's progress right away.
+                    onSwitched = { navigateToTab(Screen.Dashboard.route) }
+                )
             }
             composable(Routes.MASTERED_WORDS) {
                 MasteredWordsScreen(
                     viewModelFactory = viewModelFactory,
                     ttsManager = ttsManager,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenLanguages = { navigateToTab(Screen.Languages.route) }
                 )
             }
         }

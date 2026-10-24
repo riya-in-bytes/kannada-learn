@@ -3,10 +3,12 @@ package com.radriver.kannada.data.repository
 import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.Category
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.domain.model.Level
 import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
 import com.radriver.kannada.domain.model.QuizQuestion
 import com.radriver.kannada.domain.model.QuizWord
+import com.radriver.kannada.domain.model.romanizationKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -38,6 +40,14 @@ class WordRepository(private val wordDao: WordDao) {
             "Sixty", "Seventy", "Eighty", "Ninety",
             "Hundred", "Five hundred", "Thousand"
         )
+
+        /**
+         * Index of today's word in a language's id-ordered list. Salted per
+         * language so mirrored vocabularies don't show the same English word
+         * on the same day; KANNADA's salt is zero, keeping its original pick.
+         */
+        fun wordOfTheDayOffset(epochDay: Long, count: Int, language: Language): Int =
+            ((epochDay + language.variationSalt) % count).toInt()
     }
 
     /**
@@ -50,18 +60,17 @@ class WordRepository(private val wordDao: WordDao) {
         it.category == Category.NUMBERS && it.english !in ALLOWED_QUIZ_NUMBERS
     }
 
-    fun getAllWords(): Flow<List<WordEntity>> = wordDao.getAll()
-
-    /** Filtered word stream; null level/category means "all". */
-    fun getWords(level: Level?, category: Category?): Flow<List<WordEntity>> = when {
-        level != null && category != null -> wordDao.getByLevelAndCategory(level, category)
-        level != null -> wordDao.getByLevel(level)
-        category != null -> wordDao.getByCategory(category)
-        else -> wordDao.getAll()
+    /** Filtered word stream for [language]; null level/category means "all". */
+    fun getWords(language: Language, level: Level?, category: Category?): Flow<List<WordEntity>> = when {
+        level != null && category != null -> wordDao.getByLevelAndCategory(language, level, category)
+        level != null -> wordDao.getByLevel(language, level)
+        category != null -> wordDao.getByCategory(language, category)
+        else -> wordDao.getAll(language)
     }
 
-    /** Every word the learner has mastered, alphabetical by English. */
-    fun masteredWords(): Flow<List<WordEntity>> = wordDao.masteredWords(MASTERY_THRESHOLD)
+    /** Every [language] word the learner has mastered, alphabetical by English. */
+    fun masteredWords(language: Language): Flow<List<WordEntity>> =
+        wordDao.masteredWords(language, MASTERY_THRESHOLD)
 
     /**
      * Builds a randomized multiple-choice quiz from the local database.
@@ -71,13 +80,14 @@ class WordRepository(private val wordDao: WordDao) {
      * (null = all levels); distractors prefer the same level + category,
      * then the same level, then the global pool — so number questions get
      * number distractors and level pools stay coherent without ever being
-     * too small. Option text is kept unique per question by both Kannada
-     * and English (options are rendered in either language depending on
-     * quiz mode), and sizes are defensively clamped so a degenerate pool
-     * can never produce a broken quiz.
+     * too small. Only [language]'s words are used. Option text is kept unique
+     * per question by script, romanization and English (options are rendered
+     * in either language depending on quiz mode, and romanization is the
+     * only visible text for a language that hides its script), and sizes are
+     * defensively clamped so a degenerate pool can never produce a broken quiz.
      */
-    suspend fun buildQuiz(requestedSize: Int, level: Level? = null): List<QuizQuestion> {
-        val pool = wordDao.getAllOnce().forQuiz()
+    suspend fun buildQuiz(language: Language, requestedSize: Int, level: Level? = null): List<QuizQuestion> {
+        val pool = wordDao.getAllOnce(language).forQuiz()
         val candidates = if (level != null) pool.filter { it.level == level } else pool
         if (candidates.size < MIN_WORDS_FOR_QUIZ) return emptyList()
 
@@ -96,38 +106,42 @@ class WordRepository(private val wordDao: WordDao) {
      * distractors. Returns empty when nothing is due.
      */
     suspend fun buildReviewQuiz(
+        language: Language,
         maxSize: Int = MAX_QUIZ_SIZE,
         today: LocalDate = LocalDate.now()
     ): List<QuizQuestion> {
-        val pool = wordDao.getAllOnce().forQuiz()
+        val pool = wordDao.getAllOnce(language).forQuiz()
         if (pool.size < MIN_WORDS_FOR_QUIZ) return emptyList()
 
         // Same number filter as buildQuiz: off-list numbers aren't reviewed.
-        val due = wordDao.dueForReview(today.toEpochDay(), maxSize).forQuiz()
+        val due = wordDao.dueForReview(language, today.toEpochDay(), maxSize).forQuiz()
         // The DAO already orders by most-struggled; shuffle only the
         // presentation order so repeated sessions don't feel identical.
         return toQuestions(due.shuffled(), pool)
     }
 
     /**
-     * Live count of words due for review today (drives badges/buttons).
-     * flow{} defers LocalDate.now() to collection time so long-lived
-     * collectors get a fresh "today" whenever they re-subscribe.
+     * Live count of [language] words due for review today (drives
+     * badges/buttons). flow{} defers LocalDate.now() to collection time so
+     * long-lived collectors get a fresh "today" whenever they re-subscribe.
      */
-    fun dueForReviewCount(): Flow<Int> =
-        flow { emitAll(wordDao.dueForReviewCount(LocalDate.now().toEpochDay())) }
+    fun dueForReviewCount(language: Language): Flow<Int> =
+        flow { emitAll(wordDao.dueForReviewCount(language, LocalDate.now().toEpochDay())) }
 
     /**
-     * Deterministic date-based pick over the id-ordered word list: the same
-     * word all day, a new one each day. Emits again on table writes so a
-     * mastery change to today's word stays live; the date is read per
-     * emission, not captured. Null only while the table is empty, which
-     * cannot happen after seeding.
+     * Deterministic date-based pick over [language]'s id-ordered word list
+     * (see [wordOfTheDayOffset]): the same word all day, a new one each day.
+     * Emits again on table writes so a mastery change to today's word stays
+     * live; the date is read per emission, not captured. Null only while the
+     * language has no words, which cannot happen after seeding.
      */
-    fun wordOfTheDay(): Flow<WordEntity?> =
-        wordDao.totalCount().map { count ->
+    fun wordOfTheDay(language: Language): Flow<WordEntity?> =
+        wordDao.totalCount(language).map { count ->
             if (count == 0) null
-            else wordDao.wordAtOffset((LocalDate.now().toEpochDay() % count).toInt())
+            else wordDao.wordAtOffset(
+                language,
+                wordOfTheDayOffset(LocalDate.now().toEpochDay(), count, language)
+            )
         }
 
     private fun toQuestions(
@@ -135,7 +149,8 @@ class WordRepository(private val wordDao: WordDao) {
         distractorPool: List<WordEntity>
     ): List<QuizQuestion> = candidates.map { correct ->
         fun WordEntity.collides(other: WordEntity) =
-            id == other.id || kannada == other.kannada || english == other.english
+            id == other.id || script == other.script || english == other.english ||
+                romanizationKey(transliteration) == romanizationKey(other.transliteration)
 
         val sameLevelAndCategory = distractorPool.filter {
             !it.collides(correct) && it.level == correct.level && it.category == correct.category
@@ -148,7 +163,8 @@ class WordRepository(private val wordDao: WordDao) {
         }
         val distractors =
             (sameLevelAndCategory.shuffled() + sameLevel.shuffled() + rest.shuffled())
-                .distinctBy { it.kannada }
+                .distinctBy { it.script }
+                .distinctBy { romanizationKey(it.transliteration) }
                 .distinctBy { it.english }
                 .take(DISTRACTORS_PER_QUESTION)
 
@@ -157,8 +173,9 @@ class WordRepository(private val wordDao: WordDao) {
                 QuizWord(
                     wordId = it.id,
                     english = it.english,
-                    kannada = it.kannada,
-                    transliteration = it.transliteration
+                    script = it.script,
+                    transliteration = it.transliteration,
+                    language = it.language
                 )
             }
             .shuffled()
@@ -168,8 +185,9 @@ class WordRepository(private val wordDao: WordDao) {
             prompt = QuizWord(
                 wordId = correct.id,
                 english = correct.english,
-                kannada = correct.kannada,
-                transliteration = correct.transliteration
+                script = correct.script,
+                transliteration = correct.transliteration,
+                language = correct.language
             ),
             options = options
         )

@@ -26,6 +26,29 @@ val OnGreenContainerDark = Color(0xFFCCEBC4)
 val LightBackground = Color(0xFFFFF8F2)
 val DarkBackground = Color(0xFF17130B)
 
+// Gujarati accents, inspired by Patola silk: maroon, marigold and teal on the
+// same cream/brown backgrounds, so switching language is visible at a glance.
+val Maroon40 = Color(0xFF9C2A44)
+val MaroonContainer = Color(0xFFFFD9DD)
+val OnMaroonContainer = Color(0xFF400013)
+val Marigold40 = Color(0xFF8B5000)
+val MarigoldContainer = Color(0xFFFFDCBE)
+val OnMarigoldContainer = Color(0xFF2D1600)
+val Teal40 = Color(0xFF006A60)
+val TealContainer = Color(0xFF9EF2E4)
+val OnTealContainer = Color(0xFF00201C)
+
+val Maroon80 = Color(0xFFFFB2BC)
+val OnMaroon80 = Color(0xFF5F1127)
+val MaroonContainerDark = Color(0xFF7D1530)
+val OnMaroonContainerDark = Color(0xFFFFD9DD)
+val Marigold80 = Color(0xFFFFB870)
+val MarigoldContainerDark = Color(0xFF6A3B00)
+val OnMarigoldContainerDark = Color(0xFFFFDCBE)
+val Teal80 = Color(0xFF82D5C8)
+val TealContainerDark = Color(0xFF005048)
+val OnTealContainerDark = Color(0xFF9EF2E4)
+
 // Quiz answer feedback (used directly, same in both themes).
 val CorrectGreen = Color(0xFF2E7D32)
 val CorrectGreenContainer = Color(0xFFC8E6C9)

@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
@@ -33,8 +32,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.radriver.kannada.R
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
+import com.radriver.kannada.ui.components.LanguageBadge
 import com.radriver.kannada.ui.components.SpeakerButton
+import com.radriver.kannada.ui.components.TargetPrimaryText
+import com.radriver.kannada.ui.components.TargetSecondaryText
 import com.radriver.kannada.ui.components.TtsUnavailableHint
+import com.radriver.kannada.ui.components.displayText
 import com.radriver.kannada.util.TtsManager
 
 /** Stateful entry point: owns the ViewModel, hoists state into the stateless content. */
@@ -43,6 +46,7 @@ fun MasteredWordsScreen(
     viewModelFactory: ViewModelProvider.Factory,
     ttsManager: TtsManager,
     onBack: () -> Unit,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MasteredWordsViewModel = viewModel(factory = viewModelFactory)
 ) {
@@ -51,6 +55,7 @@ fun MasteredWordsScreen(
         uiState = uiState,
         ttsManager = ttsManager,
         onBack = onBack,
+        onOpenLanguages = onOpenLanguages,
         modifier = modifier
     )
 }
@@ -61,6 +66,7 @@ private fun MasteredWordsContent(
     uiState: MasteredWordsUiState,
     ttsManager: TtsManager,
     onBack: () -> Unit,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -83,6 +89,13 @@ private fun MasteredWordsContent(
                         contentDescription = stringResource(R.string.mastered_words_back)
                     )
                 }
+            },
+            actions = {
+                LanguageBadge(
+                    language = uiState.language,
+                    onClick = onOpenLanguages,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
             }
         )
 
@@ -147,8 +160,8 @@ private fun MasteredWordRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = word.kannada,
+                TargetPrimaryText(
+                    word = word,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -157,14 +170,18 @@ private fun MasteredWordRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                Text(
-                    text = word.transliteration,
+                TargetSecondaryText(
+                    word = word,
                     style = MaterialTheme.typography.bodySmall,
-                    fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
                 )
             }
-            SpeakerButton(text = word.kannada, ttsManager = ttsManager)
+            SpeakerButton(
+                text = word.script,
+                language = word.language,
+                label = word.displayText,
+                ttsManager = ttsManager
+            )
         }
     }
 }

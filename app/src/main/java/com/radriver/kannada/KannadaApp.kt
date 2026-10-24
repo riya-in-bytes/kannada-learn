@@ -6,6 +6,7 @@ import com.radriver.kannada.data.local.AppDatabase
 import com.radriver.kannada.data.prefs.UserPrefs
 import com.radriver.kannada.data.repository.ProgressRepository
 import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.data.session.LanguageSession
 import com.radriver.kannada.util.TtsManager
 
 /**
@@ -20,6 +21,7 @@ class AppContainer(context: Context) {
     val wordRepository = WordRepository(database.wordDao())
     val progressRepository = ProgressRepository(database.wordDao(), userPrefs)
     val ttsManager = TtsManager(appContext)
+    val languageSession = LanguageSession()
 }
 
 class KannadaApp : Application() {

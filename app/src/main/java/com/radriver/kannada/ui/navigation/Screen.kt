@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.radriver.kannada.R
 
@@ -33,7 +34,10 @@ sealed class Screen(
     data object Flashcards : Screen("flashcards", R.string.nav_flashcards, Icons.Filled.Style)
     data object Quiz : Screen("quiz", R.string.nav_quiz, Icons.Filled.Quiz)
 
+    /** Where the learner switches between Kannada and Gujarati. */
+    data object Languages : Screen("languages", R.string.nav_languages, Icons.Filled.Translate)
+
     companion object {
-        val bottomNavItems = listOf(Dashboard, Flashcards, Quiz)
+        val bottomNavItems = listOf(Dashboard, Flashcards, Quiz, Languages)
     }
 }

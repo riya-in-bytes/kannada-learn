@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +28,7 @@ import com.radriver.kannada.R
 import com.radriver.kannada.domain.model.Category
 import com.radriver.kannada.domain.model.Level
 import com.radriver.kannada.ui.components.FlashCard
+import com.radriver.kannada.ui.components.LanguageBadge
 import com.radriver.kannada.ui.components.LevelFilterRow
 import com.radriver.kannada.ui.components.TtsUnavailableHint
 import com.radriver.kannada.util.TtsManager
@@ -36,6 +38,7 @@ import com.radriver.kannada.util.TtsManager
 fun FlashcardsScreen(
     viewModelFactory: ViewModelProvider.Factory,
     ttsManager: TtsManager,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FlashcardsViewModel = viewModel(factory = viewModelFactory)
 ) {
@@ -45,6 +48,7 @@ fun FlashcardsScreen(
         ttsManager = ttsManager,
         onCategorySelected = viewModel::onCategorySelected,
         onLevelSelected = viewModel::onLevelSelected,
+        onOpenLanguages = onOpenLanguages,
         modifier = modifier
     )
 }
@@ -55,14 +59,23 @@ private fun FlashcardsContent(
     ttsManager: TtsManager,
     onCategorySelected: (Category?) -> Unit,
     onLevelSelected: (Level?) -> Unit,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = stringResource(R.string.flashcards_title),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.flashcards_title),
+                style = MaterialTheme.typography.headlineMedium
+            )
+            LanguageBadge(language = uiState.language, onClick = onOpenLanguages)
+        }
 
         LevelFilterRow(
             selected = uiState.selectedLevel,

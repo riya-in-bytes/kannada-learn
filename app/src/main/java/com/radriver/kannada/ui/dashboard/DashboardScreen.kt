@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
@@ -41,7 +40,11 @@ import com.radriver.kannada.R
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.Category
 import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
+import com.radriver.kannada.ui.components.LanguageBadge
 import com.radriver.kannada.ui.components.SpeakerButton
+import com.radriver.kannada.ui.components.TargetPrimaryText
+import com.radriver.kannada.ui.components.TargetSecondaryText
+import com.radriver.kannada.ui.components.displayText
 import com.radriver.kannada.util.TtsManager
 
 /** Stateful entry point: owns the ViewModel, hoists state into the stateless content. */
@@ -52,6 +55,7 @@ fun DashboardScreen(
     onGoToQuiz: () -> Unit,
     onGoToFlashcards: () -> Unit,
     onShowMasteredWords: () -> Unit,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = viewModel(factory = viewModelFactory)
 ) {
@@ -61,6 +65,7 @@ fun DashboardScreen(
         ttsManager = ttsManager,
         onGoToQuiz = onGoToQuiz,
         onShowMasteredWords = onShowMasteredWords,
+        onOpenLanguages = onOpenLanguages,
         // Arm the shared filter, then switch tabs: the flashcards ViewModel
         // reads the same DataStore value, so it opens on that category.
         onCategoryClick = { category ->
@@ -78,6 +83,7 @@ private fun DashboardContent(
     ttsManager: TtsManager,
     onGoToQuiz: () -> Unit,
     onShowMasteredWords: () -> Unit,
+    onOpenLanguages: () -> Unit,
     onCategoryClick: (Category) -> Unit,
     onDismissWordOfTheDay: () -> Unit,
     modifier: Modifier = Modifier
@@ -88,10 +94,17 @@ private fun DashboardContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "title") {
-            Text(
-                text = stringResource(R.string.dashboard_title),
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.dashboard_title),
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                LanguageBadge(language = uiState.language, onClick = onOpenLanguages)
+            }
         }
 
         uiState.wordOfTheDay?.let { word ->
@@ -209,14 +222,13 @@ private fun WordOfTheDayCard(
                     text = word.english,
                     style = MaterialTheme.typography.titleMedium
                 )
-                Text(
-                    text = word.kannada,
+                TargetPrimaryText(
+                    word = word,
                     style = MaterialTheme.typography.headlineMedium
                 )
-                Text(
-                    text = word.transliteration,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontStyle = FontStyle.Italic
+                TargetSecondaryText(
+                    word = word,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -226,7 +238,12 @@ private fun WordOfTheDayCard(
                         contentDescription = stringResource(R.string.dashboard_wotd_dismiss)
                     )
                 }
-                SpeakerButton(text = word.kannada, ttsManager = ttsManager)
+                SpeakerButton(
+                    text = word.script,
+                    language = word.language,
+                    label = word.displayText,
+                    ttsManager = ttsManager
+                )
             }
         }
     }

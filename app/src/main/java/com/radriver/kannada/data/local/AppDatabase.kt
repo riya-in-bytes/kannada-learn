@@ -11,8 +11,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.local.entity.WordEntity
+import com.radriver.kannada.domain.model.Language
 
-@Database(entities = [WordEntity::class], version = 3, exportSchema = false)
+@Database(entities = [WordEntity::class], version = 4, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
@@ -34,27 +35,33 @@ abstract class AppDatabase : RoomDatabase() {
                     .addCallback(SeedCallback)
                     // Never fall back to destructive migration: it would wipe
                     // the user's per-word progress (correctCount/wrongCount).
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }
 
         /**
-         * Single raw-insert path shared by [SeedCallback] and [MIGRATION_1_2]
-         * so the two call sites can never drift on columns. Any new column
-         * must be added here AND to the entity AND to the migration that
-         * introduces it.
+         * Single raw-insert path shared by [SeedCallback] and every migration
+         * so the call sites can never drift on columns. Any new column must be
+         * added here AND to the entity AND to the migration that introduces it.
+         *
+         * Older migrations run this helper against older schemas (MIGRATION_2_3
+         * runs before the `language` column exists), so a column added later is
+         * written only when its value differs from the column DEFAULT —
+         * otherwise the insert would name a column the table doesn't have yet.
          */
         private fun insertWord(db: SupportSQLiteDatabase, word: WordEntity) {
             val values = ContentValues().apply {
                 put("english", word.english)
-                put("kannada", word.kannada)
+                put("kannada", word.script)
                 put("transliteration", word.transliteration)
                 put("category", word.category.name)
                 put("level", word.level.name)
                 put("correctCount", word.correctCount)
                 put("wrongCount", word.wrongCount)
                 // lastAnsweredEpochDay intentionally omitted -> NULL (never answered)
+                // Added in v4; KANNADA rows rely on DEFAULT 'KANNADA' (see KDoc).
+                if (word.language != Language.KANNADA) put("language", word.language.name)
             }
             db.insert("words", SQLiteDatabase.CONFLICT_ABORT, values)
         }
@@ -111,6 +118,20 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 SeedData.v3Words.forEach { insertWord(db, it) }
+            }
+        }
+
+        /**
+         * v3 -> v4: second learning language. Adds the `language` column —
+         * `DEFAULT 'KANNADA'` is both the backfill for every existing row and
+         * byte-identical to the entity's @ColumnInfo(defaultValue) — then
+         * appends the Gujarati vocabulary. Existing rows and per-word progress
+         * are untouched. Same transaction/atomicity guarantees as MIGRATION_1_2.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE words ADD COLUMN language TEXT NOT NULL DEFAULT 'KANNADA'")
+                SeedData.gujaratiV1Words.forEach { insertWord(db, it) }
             }
         }
     }

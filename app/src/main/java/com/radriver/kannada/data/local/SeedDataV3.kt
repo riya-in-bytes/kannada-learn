@@ -13,14 +13,15 @@ import com.radriver.kannada.domain.model.Level
  * installs. Same transliteration scheme as [SeedData].
  *
  * Once shipped, treat this list like [SeedData.v1Words] / [SeedDataV2]:
- * append-only. Vocabulary added in a future DB v4 belongs in a new list.
+ * append-only. Vocabulary added later belongs in a new list with a new DB
+ * version (v4 was taken by the Gujarati list, [SeedDataGujarati]).
  *
  * Authoring notes (for extending this list, e.g. in a follow-up session):
  *  - Use the [conversation] helper for sentences and pick INTERMEDIATE or
  *    ADVANCED explicitly — sentences are never BEGINNER (mirrors [SeedDataV2]).
- *  - Every `english` and every `kannada` string must be unique across ALL seed
- *    data (v1 + v2 + v3); the checks in [SeedData]'s init block fail fast on
- *    any duplicate.
+ *  - Every `english` and every script string must be unique across ALL
+ *    Kannada seed data (v1 + v2 + v3); the checks in [SeedData]'s init block
+ *    fail fast on any duplicate.
  *  - Do NOT touch [SeedData.v1Words] or [SeedDataV2]; only append here.
  */
 internal object SeedDataV3 {
@@ -47,7 +48,7 @@ internal object SeedDataV3 {
     private fun MutableList<WordEntity>.word(
         category: Category, level: Level, en: String, kn: String, tr: String
     ) = add(
-        WordEntity(english = en, kannada = kn, transliteration = tr, category = category, level = level)
+        WordEntity(english = en, script = kn, transliteration = tr, category = category, level = level)
     )
 
     /** Numbers beyond the beginner set start at INTERMEDIATE (mirrors [SeedDataV2]). */

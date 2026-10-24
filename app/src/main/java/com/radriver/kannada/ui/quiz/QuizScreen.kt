@@ -2,6 +2,7 @@ package com.radriver.kannada.ui.quiz
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
@@ -44,13 +44,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.radriver.kannada.R
 import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.domain.model.Language
 import com.radriver.kannada.domain.model.Level
 import com.radriver.kannada.domain.model.QuizMode
 import com.radriver.kannada.domain.model.QuizQuestion
 import com.radriver.kannada.domain.model.QuizWord
+import com.radriver.kannada.ui.components.LanguageBadge
 import com.radriver.kannada.ui.components.LevelFilterRow
 import com.radriver.kannada.ui.components.SpeakerButton
+import com.radriver.kannada.ui.components.TargetPrimaryText
+import com.radriver.kannada.ui.components.TargetSecondaryText
 import com.radriver.kannada.ui.components.TtsUnavailableHint
+import com.radriver.kannada.ui.components.displayText
 import com.radriver.kannada.ui.theme.CorrectGreen
 import com.radriver.kannada.ui.theme.CorrectGreenContainer
 import com.radriver.kannada.ui.theme.WrongRed
@@ -64,6 +69,7 @@ import kotlin.math.roundToInt
 fun QuizScreen(
     viewModelFactory: ViewModelProvider.Factory,
     ttsManager: TtsManager,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: QuizViewModel = viewModel(factory = viewModelFactory)
 ) {
@@ -78,6 +84,7 @@ fun QuizScreen(
             onLevelSelected = viewModel::onLevelSelected,
             onStart = viewModel::startQuiz,
             onStartReview = viewModel::startReview,
+            onOpenLanguages = onOpenLanguages,
             modifier = modifier
         )
 
@@ -108,13 +115,22 @@ private fun QuizSetupContent(
     onLevelSelected: (Level?) -> Unit,
     onStart: () -> Unit,
     onStartReview: () -> Unit,
+    onOpenLanguages: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Resolve TTS availability up front so the Listening segment reflects
     // reality before the first tap, not after it.
     LaunchedEffect(Unit) { ttsManager.initialize() }
     val ttsStatus by ttsManager.status.collectAsStateWithLifecycle()
+    val voiceLanguage by ttsManager.voiceLanguage.collectAsStateWithLifecycle()
     val listeningAvailable = ttsStatus != TtsStatus.UNAVAILABLE
+    // A Listening choice carried over from a language that has a voice into
+    // one that doesn't would leave a disabled segment selected.
+    LaunchedEffect(listeningAvailable, state.mode) {
+        if (!listeningAvailable && state.mode == QuizMode.LISTENING) {
+            onModeSelected(QuizMode.EN_TO_TARGET)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -123,10 +139,18 @@ private fun QuizSetupContent(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = stringResource(R.string.quiz_title),
-            style = MaterialTheme.typography.headlineMedium
-        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.quiz_title),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            LanguageBadge(
+                language = state.language,
+                onClick = onOpenLanguages,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.quiz_start_prompt),
@@ -151,13 +175,13 @@ private fun QuizSetupContent(
                     enabled = mode != QuizMode.LISTENING || listeningAvailable
                 ) {
                     Text(
-                        text = stringResource(
-                            when (mode) {
-                                QuizMode.EN_TO_KN -> R.string.quiz_mode_en_to_kn
-                                QuizMode.KN_TO_EN -> R.string.quiz_mode_kn_to_en
-                                QuizMode.LISTENING -> R.string.quiz_mode_listening
-                            }
-                        )
+                        text = when (mode) {
+                            QuizMode.EN_TO_TARGET ->
+                                stringResource(R.string.quiz_mode_to_target, state.language.quizBadge)
+                            QuizMode.TARGET_TO_EN ->
+                                stringResource(R.string.quiz_mode_from_target, state.language.quizBadge)
+                            QuizMode.LISTENING -> stringResource(R.string.quiz_mode_listening)
+                        }
                     )
                 }
             }
@@ -165,7 +189,7 @@ private fun QuizSetupContent(
         if (!listeningAvailable) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.quiz_mode_listening_needs_tts),
+                text = stringResource(R.string.quiz_mode_listening_needs_tts, voiceLanguage.displayName),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -329,12 +353,16 @@ private fun QuizPrompt(
     currentIndex: Int
 ) {
     when (mode) {
-        QuizMode.EN_TO_KN -> Text(
-            text = stringResource(R.string.quiz_prompt, question.prompt.english),
+        QuizMode.EN_TO_TARGET -> Text(
+            text = stringResource(
+                R.string.quiz_prompt,
+                question.prompt.language.displayName,
+                question.prompt.english
+            ),
             style = MaterialTheme.typography.headlineSmall
         )
 
-        QuizMode.KN_TO_EN -> Column {
+        QuizMode.TARGET_TO_EN -> Column {
             Text(
                 text = stringResource(R.string.quiz_prompt_reverse),
                 style = MaterialTheme.typography.titleMedium
@@ -342,17 +370,21 @@ private fun QuizPrompt(
             Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Text(
-                        text = question.prompt.kannada,
+                    TargetPrimaryText(
+                        word = question.prompt,
                         style = MaterialTheme.typography.headlineMedium
                     )
-                    Text(
-                        text = question.prompt.transliteration,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontStyle = FontStyle.Italic
+                    TargetSecondaryText(
+                        word = question.prompt,
+                        style = MaterialTheme.typography.bodyLarge
                     )
                 }
-                SpeakerButton(text = question.prompt.kannada, ttsManager = ttsManager)
+                SpeakerButton(
+                    text = question.prompt.script,
+                    language = question.prompt.language,
+                    label = question.prompt.displayText,
+                    ttsManager = ttsManager
+                )
             }
         }
 
@@ -360,7 +392,7 @@ private fun QuizPrompt(
             val ttsStatus by ttsManager.status.collectAsStateWithLifecycle()
             // Speak each new question once; QUEUE_FLUSH handles rapid Next
             // taps, and a rotation merely replays the word (harmless).
-            LaunchedEffect(currentIndex) { ttsManager.speak(question.prompt.kannada) }
+            LaunchedEffect(currentIndex) { ttsManager.speak(question.prompt.script, question.prompt.language) }
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -372,7 +404,7 @@ private fun QuizPrompt(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 FilledTonalIconButton(
-                    onClick = { ttsManager.speak(question.prompt.kannada) },
+                    onClick = { ttsManager.speak(question.prompt.script, question.prompt.language) },
                     modifier = Modifier.size(64.dp)
                 ) {
                     Icon(
@@ -380,20 +412,19 @@ private fun QuizPrompt(
                         contentDescription = stringResource(R.string.quiz_replay_content_description)
                     )
                 }
-                // Reveal the script once answered — the learner should see
+                // Reveal the word once answered — the learner should see
                 // what they heard. If the engine died mid-quiz, always show
                 // it (the question degrades to reverse mode instead of
                 // becoming unanswerable).
                 if (answered || ttsStatus == TtsStatus.UNAVAILABLE) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = question.prompt.kannada,
+                    TargetPrimaryText(
+                        word = question.prompt,
                         style = MaterialTheme.typography.headlineMedium
                     )
-                    Text(
-                        text = question.prompt.transliteration,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontStyle = FontStyle.Italic
+                    TargetSecondaryText(
+                        word = question.prompt,
+                        style = MaterialTheme.typography.bodyLarge
                     )
                 }
             }
@@ -444,7 +475,7 @@ private fun QuizOptionCard(
         ),
         border = BorderStroke(1.dp, borderColor)
     ) {
-        if (mode == QuizMode.EN_TO_KN) {
+        if (mode == QuizMode.EN_TO_TARGET) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -453,21 +484,25 @@ private fun QuizOptionCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Text(
-                        text = option.kannada,
+                    TargetPrimaryText(
+                        word = option,
                         style = MaterialTheme.typography.titleLarge
                     )
-                    Text(
-                        text = option.transliteration,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontStyle = FontStyle.Italic
+                    TargetSecondaryText(
+                        word = option,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                SpeakerButton(text = option.kannada, ttsManager = ttsManager)
+                SpeakerButton(
+                    text = option.script,
+                    language = option.language,
+                    label = option.displayText,
+                    ttsManager = ttsManager
+                )
             }
         } else {
-            // KN_TO_EN and LISTENING answer in English: no speaker button —
-            // the Kannada-locale engine mangles English, and in listening
+            // TARGET_TO_EN and LISTENING answer in English: no speaker button —
+            // the target-language voice mangles English, and in listening
             // mode it would double as an unintended hint.
             Text(
                 text = option.english,
@@ -490,7 +525,12 @@ private fun QuizResultContent(
 ) {
     val fraction = if (state.total == 0) 0f else state.score.toFloat() / state.total.toFloat()
     val message = when {
-        fraction >= 1f -> stringResource(R.string.quiz_score_perfect)
+        fraction >= 1f -> stringResource(
+            when (state.language) {
+                Language.KANNADA -> R.string.quiz_score_perfect
+                Language.GUJARATI -> R.string.quiz_score_perfect_gujarati
+            }
+        )
         fraction >= 0.6f -> stringResource(R.string.quiz_score_good)
         else -> stringResource(R.string.quiz_score_low)
     }
@@ -587,8 +627,8 @@ private fun MistakeRow(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = correct.kannada,
+                    TargetPrimaryText(
+                        word = correct,
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -597,30 +637,40 @@ private fun MistakeRow(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-                    Text(
-                        text = correct.transliteration,
+                    TargetSecondaryText(
+                        word = correct,
                         style = MaterialTheme.typography.bodySmall,
-                        fontStyle = FontStyle.Italic,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
                     )
                 }
-                SpeakerButton(text = correct.kannada, ttsManager = ttsManager)
+                SpeakerButton(
+                    text = correct.script,
+                    language = correct.language,
+                    label = correct.displayText,
+                    ttsManager = ttsManager
+                )
             }
             HorizontalDivider(
                 modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f)
             )
             Text(
-                text = stringResource(R.string.quiz_mistake_you_picked, picked.kannada),
+                text = stringResource(R.string.quiz_mistake_you_picked, picked.displayText),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
             Text(
-                text = stringResource(
-                    R.string.quiz_mistake_picked_meaning,
-                    picked.transliteration,
-                    picked.english
-                ),
+                // The romanization is only extra information under a visible
+                // script; for a romanized-only language it's the line above.
+                text = if (picked.language.showsScript) {
+                    stringResource(
+                        R.string.quiz_mistake_picked_meaning,
+                        picked.transliteration,
+                        picked.english
+                    )
+                } else {
+                    stringResource(R.string.quiz_mistake_picked_meaning_only, picked.english)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
