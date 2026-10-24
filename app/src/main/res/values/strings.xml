@@ -65,6 +65,12 @@
     <string name="quiz_review_button">Review %1$d due words</string>
     <string name="quiz_review_none_due">Nothing due for review — words you answer in quizzes come back here on a spaced schedule.</string>
     <string name="quiz_review_complete">Review Complete!</string>
+    <string name="quiz_mistakes_title">Words to revise (%1$d)</string>
+    <string name="quiz_mistake_you_picked">✗ You picked: %1$s</string>
+    <string name="quiz_mistake_picked_meaning">%1$s · means “%2$s”</string>
+    <string name="quiz_retry_mistakes">Retry mistakes (%1$d)</string>
+    <string name="quiz_retry_progress">Retry · Question %1$d of %2$d</string>
+    <string name="quiz_retry_complete">Retry Complete!</string>
 
     <!-- TTS -->
     <string name="tts_unavailable">Kannada voice not available on this device. Install Kannada text-to-speech data in system settings to hear pronunciations.</string>

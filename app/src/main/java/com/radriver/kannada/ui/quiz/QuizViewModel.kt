@@ -9,11 +9,21 @@ import com.radriver.kannada.data.repository.WordRepository
 import com.radriver.kannada.domain.model.Level
 import com.radriver.kannada.domain.model.QuizMode
 import com.radriver.kannada.domain.model.QuizQuestion
+import com.radriver.kannada.domain.model.QuizWord
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** A question answered wrong, with the option the user tapped. */
+@Immutable
+data class QuizMistake(
+    val question: QuizQuestion,
+    val pickedWordId: Int
+) {
+    val picked: QuizWord get() = question.options.first { it.wordId == pickedWordId }
+}
 
 @Immutable
 sealed interface QuizUiState {
@@ -38,7 +48,10 @@ sealed interface QuizUiState {
         val selectedWordId: Int?,
         val score: Int,
         val mode: QuizMode,
-        val isReview: Boolean = false
+        val isReview: Boolean = false,
+        /** A practice round over the previous session's mistakes; doesn't touch progress. */
+        val isRetry: Boolean = false,
+        val mistakes: List<QuizMistake> = emptyList()
     ) : QuizUiState {
         val currentQuestion: QuizQuestion get() = questions[currentIndex]
         val answered: Boolean get() = selectedWordId != null
@@ -49,7 +62,11 @@ sealed interface QuizUiState {
     data class Finished(
         val score: Int,
         val total: Int,
-        val isReview: Boolean = false
+        /** Kept so a retry round replays in the same mode. */
+        val mode: QuizMode,
+        val isReview: Boolean = false,
+        val isRetry: Boolean = false,
+        val mistakes: List<QuizMistake> = emptyList()
     ) : QuizUiState
 
     companion object {
@@ -58,9 +75,9 @@ sealed interface QuizUiState {
 }
 
 /**
- * Quiz state is built imperatively by [startQuiz]/[startReview] and held in a
- * plain MutableStateFlow — deliberately NOT derived from a cold flow with
- * stateIn, which would re-randomize the quiz (and wipe progress) every time
+ * Quiz state is built imperatively by [startQuiz]/[startReview]/[retryMistakes]
+ * and held in a plain MutableStateFlow — deliberately NOT derived from a cold
+ * flow with stateIn, which would re-randomize the quiz (and wipe progress) every time
  * the screen's collector unsubscribed for longer than the stateIn timeout.
  * The two collectors in init only ever touch Setup states (guarded update),
  * so they can never disturb a quiz in progress.
@@ -177,8 +194,13 @@ class QuizViewModel(
         val isCorrect = wordId == state.currentQuestion.correctWordId
         _uiState.value = state.copy(
             selectedWordId = wordId,
-            score = if (isCorrect) state.score + 1 else state.score
+            score = if (isCorrect) state.score + 1 else state.score,
+            mistakes = if (isCorrect) state.mistakes
+            else state.mistakes + QuizMistake(state.currentQuestion, wordId)
         )
+        // A retry is practice right after seeing the answers — recording it
+        // would let words reach MASTERY_THRESHOLD (and dodge review) too easily.
+        if (state.isRetry) return
         // Fire-and-forget: mastery/review bookkeeping must not block the UI.
         // Always the tested word's id — a wrong answer counts against the
         // word the user failed, not the distractor they happened to tap.
@@ -195,11 +217,31 @@ class QuizViewModel(
             QuizUiState.Finished(
                 score = state.score,
                 total = state.questions.size,
-                isReview = state.isReview
+                mode = state.mode,
+                isReview = state.isReview,
+                isRetry = state.isRetry,
+                mistakes = state.mistakes
             )
         } else {
             state.copy(currentIndex = state.currentIndex + 1, selectedWordId = null)
         }
+    }
+
+    /** Re-asks only the missed questions, reshuffled so positions can't be memorized. */
+    fun retryMistakes() {
+        val finished = _uiState.value as? QuizUiState.Finished ?: return
+        if (finished.mistakes.isEmpty()) return
+
+        _uiState.value = QuizUiState.InProgress(
+            questions = finished.mistakes
+                .map { it.question.copy(options = it.question.options.shuffled()) }
+                .shuffled(),
+            currentIndex = 0,
+            selectedWordId = null,
+            score = 0,
+            mode = finished.mode,
+            isRetry = true
+        )
     }
 
     fun onRestart() {

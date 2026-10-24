@@ -91,6 +91,8 @@ fun QuizScreen(
 
         is QuizUiState.Finished -> QuizResultContent(
             state = state,
+            ttsManager = ttsManager,
+            onRetryMistakes = viewModel::retryMistakes,
             onRestart = viewModel::onRestart,
             modifier = modifier
         )
@@ -260,7 +262,11 @@ private fun QuizQuestionContent(
             .padding(16.dp)
     ) {
         Text(
-            text = stringResource(R.string.quiz_progress, state.currentIndex + 1, state.questions.size),
+            text = stringResource(
+                if (state.isRetry) R.string.quiz_retry_progress else R.string.quiz_progress,
+                state.currentIndex + 1,
+                state.questions.size
+            ),
             style = MaterialTheme.typography.labelLarge
         )
         LinearProgressIndicator(
@@ -477,6 +483,8 @@ private fun QuizOptionCard(
 @Composable
 private fun QuizResultContent(
     state: QuizUiState.Finished,
+    ttsManager: TtsManager,
+    onRetryMistakes: () -> Unit,
     onRestart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -487,16 +495,22 @@ private fun QuizResultContent(
         else -> stringResource(R.string.quiz_score_low)
     }
 
+    // Scrollable for the mistakes list; that also rules out
+    // Arrangement.Center, so the top padding stands in for it.
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, top = 48.dp, end = 24.dp, bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = stringResource(
-                if (state.isReview) R.string.quiz_review_complete else R.string.quiz_score_title
+                when {
+                    state.isRetry -> R.string.quiz_retry_complete
+                    state.isReview -> R.string.quiz_review_complete
+                    else -> R.string.quiz_score_title
+                }
             ),
             style = MaterialTheme.typography.headlineMedium
         )
@@ -513,8 +527,103 @@ private fun QuizResultContent(
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = onRestart) {
-            Text(stringResource(R.string.quiz_restart))
+
+        if (state.mistakes.isEmpty()) {
+            Button(onClick = onRestart) {
+                Text(stringResource(R.string.quiz_restart))
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.quiz_mistakes_title, state.mistakes.size),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            TtsUnavailableHint(ttsManager = ttsManager)
+            Spacer(modifier = Modifier.height(8.dp))
+            state.mistakes.forEach { mistake ->
+                MistakeRow(
+                    mistake = mistake,
+                    ttsManager = ttsManager,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onRetryMistakes) {
+                Text(stringResource(R.string.quiz_retry_mistakes, state.mistakes.size))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onRestart) {
+                Text(stringResource(R.string.quiz_restart))
+            }
+        }
+    }
+}
+
+/**
+ * A missed question for end-of-quiz revision: the full correct word, then
+ * the full wrong pick — whatever the quiz mode — so the learner sees what
+ * the two were confused with. Theme error color rather than WrongRed: the
+ * fixed red is unreadable on the dark-theme secondaryContainer.
+ */
+@Composable
+private fun MistakeRow(
+    mistake: QuizMistake,
+    ttsManager: TtsManager,
+    modifier: Modifier = Modifier
+) {
+    val correct = mistake.question.prompt
+    val picked = mistake.picked
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = correct.kannada,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = correct.english,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = correct.transliteration,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                    )
+                }
+                SpeakerButton(text = correct.kannada, ttsManager = ttsManager)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp),
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f)
+            )
+            Text(
+                text = stringResource(R.string.quiz_mistake_you_picked, picked.kannada),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Text(
+                text = stringResource(
+                    R.string.quiz_mistake_picked_meaning,
+                    picked.transliteration,
+                    picked.english
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
