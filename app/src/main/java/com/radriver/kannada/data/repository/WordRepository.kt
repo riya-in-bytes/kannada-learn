@@ -4,6 +4,7 @@ import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.local.entity.WordEntity
 import com.radriver.kannada.domain.model.Category
 import com.radriver.kannada.domain.model.Level
+import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
 import com.radriver.kannada.domain.model.QuizQuestion
 import com.radriver.kannada.domain.model.QuizWord
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,32 @@ class WordRepository(private val wordDao: WordDao) {
 
         /** A quiz needs at least one correct answer + three distractors. */
         const val MIN_WORDS_FOR_QUIZ = DISTRACTORS_PER_QUESTION + 1
+
+        /**
+         * The only [Category.NUMBERS] words allowed into quizzes/reviews:
+         * 1-10, the tens through 100, 500 and 1000. All other numbers
+         * (11-19, 21-29, zero, …) stay browsable in flashcards but are
+         * filtered out of quizzes so drilling doesn't fixate on them.
+         * An allow-list (not a block-list) means any future off-list number
+         * is excluded automatically. Matched by [WordEntity.english].
+         */
+        val ALLOWED_QUIZ_NUMBERS = setOf(
+            "One", "Two", "Three", "Four", "Five",
+            "Six", "Seven", "Eight", "Nine", "Ten",
+            "Twenty", "Thirty", "Forty", "Fifty",
+            "Sixty", "Seventy", "Eighty", "Ninety",
+            "Hundred", "Five hundred", "Thousand"
+        )
+    }
+
+    /**
+     * Drops the number words that shouldn't appear in quizzes (see
+     * [ALLOWED_QUIZ_NUMBERS]). Applied to the whole quiz pool so excluded
+     * numbers can't sneak in as distractors either. Non-number categories
+     * pass through untouched.
+     */
+    private fun List<WordEntity>.forQuiz(): List<WordEntity> = filterNot {
+        it.category == Category.NUMBERS && it.english !in ALLOWED_QUIZ_NUMBERS
     }
 
     fun getAllWords(): Flow<List<WordEntity>> = wordDao.getAll()
@@ -32,6 +59,9 @@ class WordRepository(private val wordDao: WordDao) {
         category != null -> wordDao.getByCategory(category)
         else -> wordDao.getAll()
     }
+
+    /** Every word the learner has mastered, alphabetical by English. */
+    fun masteredWords(): Flow<List<WordEntity>> = wordDao.masteredWords(MASTERY_THRESHOLD)
 
     /**
      * Builds a randomized multiple-choice quiz from the local database.
@@ -47,7 +77,7 @@ class WordRepository(private val wordDao: WordDao) {
      * can never produce a broken quiz.
      */
     suspend fun buildQuiz(requestedSize: Int, level: Level? = null): List<QuizQuestion> {
-        val pool = wordDao.getAllOnce()
+        val pool = wordDao.getAllOnce().forQuiz()
         val candidates = if (level != null) pool.filter { it.level == level } else pool
         if (candidates.size < MIN_WORDS_FOR_QUIZ) return emptyList()
 
@@ -69,10 +99,11 @@ class WordRepository(private val wordDao: WordDao) {
         maxSize: Int = MAX_QUIZ_SIZE,
         today: LocalDate = LocalDate.now()
     ): List<QuizQuestion> {
-        val pool = wordDao.getAllOnce()
+        val pool = wordDao.getAllOnce().forQuiz()
         if (pool.size < MIN_WORDS_FOR_QUIZ) return emptyList()
 
-        val due = wordDao.dueForReview(today.toEpochDay(), maxSize)
+        // Same number filter as buildQuiz: off-list numbers aren't reviewed.
+        val due = wordDao.dueForReview(today.toEpochDay(), maxSize).forQuiz()
         // The DAO already orders by most-struggled; shuffle only the
         // presentation order so repeated sessions don't feel identical.
         return toQuestions(due.shuffled(), pool)

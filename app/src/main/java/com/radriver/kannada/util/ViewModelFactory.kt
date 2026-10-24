@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.radriver.kannada.AppContainer
 import com.radriver.kannada.ui.dashboard.DashboardViewModel
 import com.radriver.kannada.ui.flashcards.FlashcardsViewModel
+import com.radriver.kannada.ui.mastered.MasteredWordsViewModel
 import com.radriver.kannada.ui.quiz.QuizViewModel
 
 /**
@@ -14,7 +15,8 @@ import com.radriver.kannada.ui.quiz.QuizViewModel
  * be added to any initializer later without restructuring).
  */
 fun appViewModelFactory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
-    initializer { DashboardViewModel(container.progressRepository, container.wordRepository) }
+    initializer { DashboardViewModel(container.progressRepository, container.wordRepository, container.userPrefs) }
     initializer { FlashcardsViewModel(container.wordRepository, container.userPrefs) }
+    initializer { MasteredWordsViewModel(container.wordRepository) }
     initializer { QuizViewModel(container.wordRepository, container.progressRepository, container.userPrefs) }
 }

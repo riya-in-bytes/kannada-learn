@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.radriver.kannada.data.local.dao.WordDao
 import com.radriver.kannada.data.local.entity.WordEntity
 
-@Database(entities = [WordEntity::class], version = 2, exportSchema = false)
+@Database(entities = [WordEntity::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
@@ -34,7 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addCallback(SeedCallback)
                     // Never fall back to destructive migration: it would wipe
                     // the user's per-word progress (correctCount/wrongCount).
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
@@ -98,6 +98,19 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE words ADD COLUMN wrongCount INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE words ADD COLUMN lastAnsweredEpochDay INTEGER")
                 SeedData.v2Words.forEach { insertWord(db, it) }
+            }
+        }
+
+        /**
+         * v2 -> v3: insert-only vocabulary top-up (more Conversations sentences
+         * and the hundreds 200-900). No schema change, so it just appends the new
+         * rows via the shared [insertWord] helper; existing rows and per-word
+         * progress are untouched. Same transaction/atomicity guarantees as
+         * MIGRATION_1_2.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                SeedData.v3Words.forEach { insertWord(db, it) }
             }
         }
     }

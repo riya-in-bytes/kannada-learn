@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,15 +79,28 @@ private fun FlashcardsContent(
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Stable keys: moves/updates animate correctly and item state
-            // (e.g. speaker ripple) never bleeds between cards.
-            items(uiState.words, key = { it.id }) { word ->
-                FlashCard(word = word, ttsManager = ttsManager)
+        if (!uiState.isLoading && uiState.words.isEmpty()) {
+            // Reachable via the dashboard's category deep-link, which leaves
+            // the level filter alone — so e.g. Numbers + Advanced lands here.
+            Text(
+                text = stringResource(R.string.flashcards_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 48.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Stable keys: moves/updates animate correctly and item state
+                // (e.g. speaker ripple) never bleeds between cards.
+                items(uiState.words, key = { it.id }) { word ->
+                    FlashCard(word = word, ttsManager = ttsManager)
+                }
             }
         }
     }

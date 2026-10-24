@@ -6,12 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.radriver.kannada.data.local.dao.CategoryProgress
 import com.radriver.kannada.data.local.dao.LevelProgress
 import com.radriver.kannada.data.local.entity.WordEntity
+import com.radriver.kannada.data.prefs.UserPrefs
 import com.radriver.kannada.data.repository.ProgressRepository
 import com.radriver.kannada.data.repository.WordRepository
+import com.radriver.kannada.domain.model.Category
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 @Immutable
 data class DashboardUiState(
@@ -28,13 +32,20 @@ data class DashboardUiState(
 
 class DashboardViewModel(
     progressRepository: ProgressRepository,
-    wordRepository: WordRepository
+    wordRepository: WordRepository,
+    private val userPrefs: UserPrefs
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = combine(
         progressRepository.dashboardData,
-        wordRepository.wordOfTheDay()
-    ) { data, wordOfTheDay ->
+        wordRepository.wordOfTheDay(),
+        userPrefs.wotdDismissedEpochDay
+    ) { data, wordOfTheDay, dismissedEpochDay ->
+        // Hide today's word once dismissed; it returns tomorrow because
+        // wordOfTheDay() picks a new word each day and "today" is read here
+        // per emission (correct across a midnight rollover).
+        val visibleWord =
+            wordOfTheDay?.takeUnless { dismissedEpochDay == LocalDate.now().toEpochDay() }
         DashboardUiState(
             isLoading = false,
             currentStreak = data.currentStreak,
@@ -44,7 +55,7 @@ class DashboardViewModel(
             categoryProgress = data.categoryProgress,
             levelProgress = data.levelProgress,
             dueForReview = data.dueForReview,
-            wordOfTheDay = wordOfTheDay
+            wordOfTheDay = visibleWord
         )
     }
         .stateIn(
@@ -56,4 +67,18 @@ class DashboardViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DashboardUiState()
         )
+
+    /** Dismisses the Word of the Day for the rest of today. */
+    fun onDismissWordOfTheDay() {
+        viewModelScope.launch { userPrefs.dismissWordOfTheDay() }
+    }
+
+    /**
+     * Arms the shared flashcards filter so the caller can switch to that tab
+     * and land on the tapped category. The filter lives in DataStore precisely
+     * so it can be written from here — see [UserPrefs.selectedCategory].
+     */
+    fun onCategorySelected(category: Category) {
+        viewModelScope.launch { userPrefs.setSelectedCategory(category) }
+    }
 }

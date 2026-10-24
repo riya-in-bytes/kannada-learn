@@ -8,14 +8,16 @@ import com.radriver.kannada.data.prefs.UserPrefs
 import com.radriver.kannada.data.repository.WordRepository
 import com.radriver.kannada.domain.model.Category
 import com.radriver.kannada.domain.model.Level
+import com.radriver.kannada.domain.model.numberDisplayRank
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 @Immutable
 data class FlashcardsUiState(
@@ -33,21 +35,41 @@ class FlashcardsViewModel(
     private val userPrefs: UserPrefs
 ) : ViewModel() {
 
-    private val selectedCategory = MutableStateFlow<Category?>(null)
-
     /**
-     * Level lives in DataStore (not a local MutableStateFlow like category):
-     * the same selection drives the quiz setup screen and survives process
-     * death, so the source of truth must sit below both ViewModels.
+     * Both filters live in DataStore rather than in local MutableStateFlows:
+     * each is written from more than one screen — level by the quiz setup,
+     * category by the dashboard's "Progress by Category" rows, which set the
+     * filter and then switch to this tab — so the source of truth has to sit
+     * below every ViewModel that touches it. It also survives process death.
      */
+    private val selectedCategory = userPrefs.selectedCategory
     private val selectedLevel = userPrefs.selectedLevel
 
+    /** Advances every few app launches; drives the deterministic reshuffle. */
+    private val shuffleSeed = userPrefs.shuffleSeed
+
     /**
-     * flatMapLatest re-subscribes the Room flow whenever a filter changes,
-     * cancelling the previous query's collection.
+     * flatMapLatest re-subscribes the Room flow whenever a filter (or the
+     * shuffle seed) changes, cancelling the previous query's collection. The
+     * DAO returns id-ordered rows; we reorder them here so the same words
+     * don't always sit at the top. Mixing the active filter into the seed
+     * makes each category/level view shuffle to its own stable order, and the
+     * seed only advances on a new launch — so a session never reshuffles
+     * mid-use (rotation, tab switch). The Numbers tab is the exception: it is
+     * never shuffled and counts up in [numberDisplayRank] order instead.
      */
-    private val words = combine(selectedLevel, selectedCategory, ::Pair)
-        .flatMapLatest { (level, category) -> wordRepository.getWords(level, category) }
+    private val words = combine(selectedLevel, selectedCategory, shuffleSeed, ::Triple)
+        .flatMapLatest { (level, category, seed) ->
+            wordRepository.getWords(level, category).map { list ->
+                if (category == Category.NUMBERS) {
+                    // Stable sort: unranked numbers keep their id order.
+                    list.sortedBy { numberDisplayRank(it.english) }
+                } else {
+                    val mixed = seed * 31 + (category?.ordinal ?: 0) * 7 + (level?.ordinal ?: 0)
+                    list.shuffled(Random(mixed))
+                }
+            }
+        }
 
     val uiState: StateFlow<FlashcardsUiState> =
         combine(selectedCategory, selectedLevel, words) { category, level, wordList ->
@@ -64,7 +86,7 @@ class FlashcardsViewModel(
         )
 
     fun onCategorySelected(category: Category?) {
-        selectedCategory.value = category
+        viewModelScope.launch { userPrefs.setSelectedCategory(category) }
     }
 
     fun onLevelSelected(level: Level?) {

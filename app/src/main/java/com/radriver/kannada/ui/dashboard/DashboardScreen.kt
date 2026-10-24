@@ -1,5 +1,6 @@
 package com.radriver.kannada.ui.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,11 +14,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.radriver.kannada.R
 import com.radriver.kannada.data.local.entity.WordEntity
+import com.radriver.kannada.domain.model.Category
 import com.radriver.kannada.domain.model.MASTERY_THRESHOLD
 import com.radriver.kannada.ui.components.SpeakerButton
 import com.radriver.kannada.util.TtsManager
@@ -45,6 +50,8 @@ fun DashboardScreen(
     viewModelFactory: ViewModelProvider.Factory,
     ttsManager: TtsManager,
     onGoToQuiz: () -> Unit,
+    onGoToFlashcards: () -> Unit,
+    onShowMasteredWords: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = viewModel(factory = viewModelFactory)
 ) {
@@ -53,6 +60,14 @@ fun DashboardScreen(
         uiState = uiState,
         ttsManager = ttsManager,
         onGoToQuiz = onGoToQuiz,
+        onShowMasteredWords = onShowMasteredWords,
+        // Arm the shared filter, then switch tabs: the flashcards ViewModel
+        // reads the same DataStore value, so it opens on that category.
+        onCategoryClick = { category ->
+            viewModel.onCategorySelected(category)
+            onGoToFlashcards()
+        },
+        onDismissWordOfTheDay = viewModel::onDismissWordOfTheDay,
         modifier = modifier
     )
 }
@@ -62,6 +77,9 @@ private fun DashboardContent(
     uiState: DashboardUiState,
     ttsManager: TtsManager,
     onGoToQuiz: () -> Unit,
+    onShowMasteredWords: () -> Unit,
+    onCategoryClick: (Category) -> Unit,
+    onDismissWordOfTheDay: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -78,7 +96,11 @@ private fun DashboardContent(
 
         uiState.wordOfTheDay?.let { word ->
             item(key = "wotd") {
-                WordOfTheDayCard(word = word, ttsManager = ttsManager)
+                WordOfTheDayCard(
+                    word = word,
+                    ttsManager = ttsManager,
+                    onDismiss = onDismissWordOfTheDay
+                )
             }
         }
 
@@ -103,7 +125,10 @@ private fun DashboardContent(
                         uiState.totalWords
                     ),
                     label = stringResource(R.string.words_mastered_label),
-                    support = stringResource(R.string.dashboard_hint, MASTERY_THRESHOLD)
+                    support = stringResource(R.string.dashboard_hint, MASTERY_THRESHOLD),
+                    // Tappable even at zero — the list explains how to get there.
+                    onClick = onShowMasteredWords,
+                    onClickLabel = stringResource(R.string.words_mastered_open)
                 )
             }
         }
@@ -142,7 +167,12 @@ private fun DashboardContent(
             ProgressBarCard(
                 title = progress.category.displayName,
                 mastered = progress.mastered,
-                total = progress.total
+                total = progress.total,
+                onClick = { onCategoryClick(progress.category) },
+                onClickLabel = stringResource(
+                    R.string.category_open,
+                    progress.category.displayName
+                )
             )
         }
     }
@@ -152,6 +182,7 @@ private fun DashboardContent(
 private fun WordOfTheDayCard(
     word: WordEntity,
     ttsManager: TtsManager,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -164,11 +195,11 @@ private fun WordOfTheDayCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(start = 16.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f, fill = false)) {
+            Column(modifier = Modifier.weight(1f, fill = false).padding(top = 12.dp, bottom = 12.dp)) {
                 Text(
                     text = stringResource(R.string.dashboard_wotd_title),
                     style = MaterialTheme.typography.labelLarge
@@ -188,7 +219,15 @@ private fun WordOfTheDayCard(
                     fontStyle = FontStyle.Italic
                 )
             }
-            SpeakerButton(text = word.kannada, ttsManager = ttsManager)
+            Column(horizontalAlignment = Alignment.End) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.dashboard_wotd_dismiss)
+                    )
+                }
+                SpeakerButton(text = word.kannada, ttsManager = ttsManager)
+            }
         }
     }
 }
@@ -227,16 +266,24 @@ private fun ReviewDueCard(
     }
 }
 
+/**
+ * A stat tile. [onClick] is optional because only some tiles drill down —
+ * applied as a modifier rather than via the clickable `Card` overload, which
+ * would mean duplicating the whole body for the two cases.
+ */
 @Composable
 private fun StatCard(
     icon: ImageVector,
     value: String,
     label: String,
     support: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = if (onClick == null) modifier
+        else modifier.clickable(onClickLabel = onClickLabel, onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
@@ -273,28 +320,52 @@ private fun StatCard(
     }
 }
 
-/** One labeled mastery bar; used for both level rows and category rows. */
+/**
+ * One labeled mastery bar; used for both level rows and category rows.
+ * [onClick] is optional: category rows open that category's flashcards,
+ * level rows have nowhere to go and stay inert.
+ */
 @Composable
 private fun ProgressBarCard(
     title: String,
     mastered: Int,
     total: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .let {
+                if (onClick == null) it
+                else it.clickable(onClickLabel = onClickLabel, onClick = onClick)
+            }
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                Text(
-                    text = stringResource(R.string.words_mastered_value, mastered, total),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.words_mastered_value, mastered, total),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (onClick != null) {
+                        // Signals the row is a drill-down.
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             LinearProgressIndicator(

@@ -79,8 +79,11 @@ object SeedData {
     /** Added in DB v2 — see [SeedDataV2]. */
     val v2Words: List<WordEntity> = SeedDataV2.words
 
+    /** Added in DB v3 — see [SeedDataV3]. */
+    val v3Words: List<WordEntity> = SeedDataV3.words
+
     /** The full vocabulary a fresh install seeds. */
-    val words: List<WordEntity> = v1Words + v2Words
+    val words: List<WordEntity> = v1Words + v2Words + v3Words
 
     init {
         // buildQuiz dedupes options by kannada AND english, so seed duplicates

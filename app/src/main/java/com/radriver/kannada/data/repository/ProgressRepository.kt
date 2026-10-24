@@ -82,4 +82,7 @@ class ProgressRepository(
 
     /** Called on every app foreground; keeps the daily streak up to date. */
     suspend fun recordAppOpen() = userPrefs.recordAppOpen()
+
+    /** Called once per genuine launch; drives the flashcard reshuffle cadence. */
+    suspend fun incrementAppOpenCount() = userPrefs.incrementAppOpenCount()
 }

@@ -58,6 +58,15 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM words WHERE correctCount >= :threshold")
     fun masteredCount(threshold: Int): Flow<Int>
 
+    /**
+     * The words behind [masteredCount] — same predicate, so the list and the
+     * counter can never disagree. Not ordered by category: that column stores
+     * the enum *name*, so SQL would sort it alphabetically; callers that want
+     * category order group and sort by ordinal in Kotlin.
+     */
+    @Query("SELECT * FROM words WHERE correctCount >= :threshold ORDER BY english COLLATE NOCASE")
+    fun masteredWords(threshold: Int): Flow<List<WordEntity>>
+
     @Query("SELECT COUNT(*) FROM words")
     fun totalCount(): Flow<Int>
 

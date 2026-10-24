@@ -19,6 +19,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.radriver.kannada.ui.dashboard.DashboardScreen
 import com.radriver.kannada.ui.flashcards.FlashcardsScreen
+import com.radriver.kannada.ui.mastered.MasteredWordsScreen
 import com.radriver.kannada.ui.quiz.QuizScreen
 import com.radriver.kannada.util.TtsManager
 
@@ -61,8 +62,11 @@ fun KannadaNavGraph(
                 Screen.bottomNavItems.forEach { screen ->
                     val label = stringResource(screen.labelRes)
                     NavigationBarItem(
-                        selected = currentDestination?.hierarchy
-                            ?.any { it.route == screen.route } == true,
+                        // childRoutes keeps a tab lit while one of its pushed
+                        // screens (e.g. the mastered word list) is on top.
+                        selected = currentDestination?.hierarchy?.any {
+                            it.route == screen.route || it.route in screen.childRoutes
+                        } == true,
                         onClick = { navigateToTab(screen.route) },
                         icon = { Icon(screen.icon, contentDescription = null) },
                         label = { Text(label) }
@@ -80,7 +84,11 @@ fun KannadaNavGraph(
                 DashboardScreen(
                     viewModelFactory = viewModelFactory,
                     ttsManager = ttsManager,
-                    onGoToQuiz = { navigateToTab(Screen.Quiz.route) }
+                    onGoToQuiz = { navigateToTab(Screen.Quiz.route) },
+                    onGoToFlashcards = { navigateToTab(Screen.Flashcards.route) },
+                    // A plain push, not navigateToTab: this screen sits on top
+                    // of the dashboard, and popUpTo(start) would drop it.
+                    onShowMasteredWords = { navController.navigate(Routes.MASTERED_WORDS) }
                 )
             }
             composable(Screen.Flashcards.route) {
@@ -88,6 +96,13 @@ fun KannadaNavGraph(
             }
             composable(Screen.Quiz.route) {
                 QuizScreen(viewModelFactory = viewModelFactory, ttsManager = ttsManager)
+            }
+            composable(Routes.MASTERED_WORDS) {
+                MasteredWordsScreen(
+                    viewModelFactory = viewModelFactory,
+                    ttsManager = ttsManager,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

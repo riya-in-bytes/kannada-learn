@@ -22,6 +22,12 @@ class MainActivity : ComponentActivity() {
         val container = (application as KannadaApp).container
         val viewModelFactory = appViewModelFactory(container)
 
+        // Count genuine launches (not config-change recreations like rotation)
+        // so the flashcard list reshuffles every few opens.
+        if (savedInstanceState == null) {
+            lifecycleScope.launch { container.progressRepository.incrementAppOpenCount() }
+        }
+
         // Warm the TTS engine early so the first speaker tap is instant.
         // The manager is app-scoped: rotations don't tear it down.
         container.ttsManager.initialize()

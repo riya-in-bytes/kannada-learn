@@ -17,10 +17,20 @@
     <string name="level_progress_title">Progress by Level</string>
     <string name="dashboard_hint">Answer a word correctly %1$d times in quizzes to master it.</string>
     <string name="dashboard_wotd_title">Word of the Day</string>
+    <string name="dashboard_wotd_dismiss">Dismiss word of the day</string>
     <string name="dashboard_due_review">%1$d words due for review — practice in Quiz</string>
+    <string name="words_mastered_open">Show the mastered words</string>
+    <string name="category_open">Show %1$s flashcards</string>
+
+    <!-- Mastered words -->
+    <string name="mastered_words_title">Mastered Words</string>
+    <string name="mastered_words_count">%1$d words</string>
+    <string name="mastered_words_back">Back</string>
+    <string name="mastered_words_empty">No words mastered yet. Answer a word correctly %1$d times in quizzes and it will show up here.</string>
 
     <!-- Flashcards -->
     <string name="flashcards_title">Flashcards</string>
+    <string name="flashcards_empty">No words match these filters — try another level or “All”.</string>
     <string name="category_all">All</string>
     <string name="level_all">All levels</string>
     <string name="mastered_badge">Mastered</string>
