@@ -1,6 +1,8 @@
-# Kannada Learn — ಕನ್ನಡ ಕಲಿ
+# Pocket Shaala
 
-A 100% local-first Android app for English speakers learning Kannada. No network
+Shows as **Pathshala** under the app icon.
+
+A 100% local-first Android app for English speakers learning Kannada and Gujarati. No network
 permission, no external database, no paid APIs — vocabulary lives in an on-device
 Room (SQLite) database, progress metrics in Preferences DataStore, and
 pronunciation comes from Android's native TextToSpeech engine set to the
@@ -18,6 +20,10 @@ Kannada (`kn`) locale.
 - **Progress dashboard** — consecutive daily streak (current + longest) and
   words-mastered counts, overall and per category. A word is mastered after
   **3 correct quiz answers** (`MASTERY_THRESHOLD` in `domain/model/Mastery.kt`).
+- **Gujarati (second language)** — the **Languages** tab switches every screen
+  to a Gujarati mirror of the Kannada vocabulary, with its own progress. Gujarati
+  is shown in English letters only: its script is stored solely so the `gu`
+  TTS voice can pronounce it. The app always opens in Kannada.
 
 ## Architecture
 
@@ -76,11 +82,30 @@ with any local Gradle, or copy the jar from any Gradle 8.x project.
    return → still there.
 5. Next calendar day, open the app → streak becomes 2 (any gap resets to 1).
 
+Gujarati:
+
+6. Languages tab → both languages show their own mastered/total and due counts;
+   **Switch** on Gujarati jumps to Home, and every title badge reads "Gujarati"
+   (tapping a badge opens the Languages tab). Accent colours change.
+7. No Gujarati script anywhere — word of the day, flashcards, all three quiz
+   modes (including the listening reveal), mistakes and the mastered list show
+   the romanization only; quiz options are four distinct romanizations.
+8. With the Gujarati voice installed, speaker buttons and Listening mode work;
+   without it the hint names Gujarati, Listening is disabled (a selected
+   Listening mode falls back to EN → GU), and Kannada speech still works after
+   switching back.
+9. Switch language mid-quiz (or while "building") → the quiz resets to a Setup
+   in the new language with that language's due count. Rotation keeps Gujarati.
+10. Back out (Back on Home) / swipe the app away, then relaunch → it opens in
+    **Kannada**. Pressing Home and returning resumes where you were (Gujarati).
+11. Upgrade over an existing install (`adb install -r`, same signing key) →
+    Kannada progress intact, Gujarati added at 0 mastered.
+
 ## Device notes
 
-- **Kannada TTS voice**: Google's TTS engine usually needs the Kannada voice
-  data installed (Settings → Accessibility → Text-to-speech). Without it the
-  app shows an inline hint and disables speaker buttons instead of failing.
+- **Kannada / Gujarati TTS voices**: Google's TTS engine usually needs each
+  voice's data installed (Settings → Accessibility → Text-to-speech). Without it
+  the app shows an inline hint and disables speaker buttons instead of failing.
 - **Kannada script rendering**: AOSP ships Noto Sans Kannada since Lollipop, so
   script renders on effectively all API 24+ devices; a rare stripped-down OEM
   build without Indic fonts would show tofu boxes.

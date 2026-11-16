@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.radriver.kannada"
+    namespace = "com.riyainbytes.pocketshaala"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.radriver.kannada"
+        applicationId = "com.riyainbytes.pocketshaala"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -81,4 +81,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // JVM unit tests (app/src/test) for pure-Kotlin logic: seed invariants, quiz building.
+    testImplementation(libs.junit)
 }
