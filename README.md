@@ -1,6 +1,8 @@
-# Kannada Learn — ಕನ್ನಡ ಕಲಿ
+# Pocket Shaala
 
-A 100% local-first Android app for English speakers learning Kannada. No network
+Shows as **Pathshala** under the app icon.
+
+A 100% local-first Android app for English speakers learning Kannada and Gujarati. No network
 permission, no external database, no paid APIs — vocabulary lives in an on-device
 Room (SQLite) database, progress metrics in Preferences DataStore, and
 pronunciation comes from Android's native TextToSpeech engine set to the

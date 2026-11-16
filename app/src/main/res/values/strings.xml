@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Kannada Learn</string>
+    <string name="app_name">Pocket Shaala</string>
+    <!-- Label under the home-screen icon (MainActivity). Deliberately a different word from app_name. -->
+    <string name="app_launcher_name">Pathshala</string>
 
     <!-- Navigation -->
     <string name="nav_dashboard">Dashboard</string>
